@@ -1,33 +1,13 @@
-# Byte-compiled / optimized / DLL files
+.venv/
 __pycache__/
-*.py[cod]
-*$py.class
+*.pyc
+.ipynb_checkpoints/
 
-# Virtual Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Kaggle Dataset Files (Do not commit large datasets!)
-data/*.csv
-data/*.pdf
-!data/card_lookup.py
-
-# Kaggle Submissions
+# Kaggle / Submission files
 submission.tar.gz
-deck.csv
+competition_files/
+data/
 
-# Local Evaluation outputs
-eval/result.html
-eval/*.json
-eval/*.log
-
-# IDE / OS Files
-.vscode/
-.idea/
+# OS files
 .DS_Store
-*.swp
+Thumbs.db

@@ -27,6 +27,11 @@ This repository contains the source code for an RL/Rule-Based agent built for th
    ```
    Place the resulting files (`EN_Card_Data.csv`, etc.) in the `data/` folder.
 
+## Project Status
+- **Phase 0 (Deck Selection)**: Completed. A strictly legal Mono-Water deck was created and verified against the Kaggle engine rules.
+- **Phase 1 (Rule-Based Agent)**: Completed. The baseline heuristic agent (`src/agent/rule_based.py`) is deployed on Kaggle and currently matched on the ladder with a provisional rating of 600.0.
+- **Phase 2 (RL Agent)**: In Planning. Migrating to the built-in fast C++ `cg` simulator for PPO training.
+
 ## Usage
 
 **Validate Locally**

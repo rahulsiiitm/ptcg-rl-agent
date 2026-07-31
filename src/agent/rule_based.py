@@ -1,6 +1,18 @@
 import random
 import time
 
+def _read_deck() -> list[int]:
+    import os
+    file_path = "deck.csv"
+    if not os.path.exists(file_path):
+        file_path = "/kaggle_simulations/agent/" + file_path
+    with open(file_path, "r") as file:
+        csv = file.read().split("\n")
+    deck = []
+    for i in range(60):
+        deck.append(int(csv[i]))
+    return deck
+
 def rule_based_agent(obs_dict: dict) -> list[int]:
     """
     A robust heuristic rule-based agent for the Kaggle PTGC challenge.
@@ -12,7 +24,7 @@ def rule_based_agent(obs_dict: dict) -> list[int]:
     try:
         select_data = obs_dict.get("select")
         if not select_data:
-            return []
+            return _read_deck()
 
         options = select_data.get("option", [])
         if not options:
