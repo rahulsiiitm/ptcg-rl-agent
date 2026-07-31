@@ -79,3 +79,8 @@ outside the project — it's subject to competition rules.
 ## Current status
 Not started. Dataset not yet downloaded. Next action: download `EN_Card_Data.csv` 
 from the competition's dataset tab into `data/`, then begin Phase 0.
+
+## Local Hardware Specs
+- CPU: AMD Ryzen 5 5600H (12 logical cores)
+- GPU: NVIDIA GeForce RTX 3050 Laptop GPU
+- **Actionable Note**: PyTorch code should target `cuda` to leverage the RTX 3050 for RL model training. CPU multiprocessing can be used for environment rollout collection.
