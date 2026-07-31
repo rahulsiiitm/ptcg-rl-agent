@@ -5,6 +5,8 @@ The cabt container is FROM gcr.io/kaggle-images/python:v163 which has torch.
 import os
 import sys
 import numpy as np
+import torch
+import torch.nn as nn
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -13,8 +15,7 @@ from src.agent.action_mask import sample_valid_action, MAX_ACTION_SPACE
 
 # Global singletons
 _encoder = None
-_weights = None   # NumPy weights dict (loaded from .npz)
-
+_model = None
 
 def _read_deck() -> list[int]:
     file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "deck.csv")
@@ -24,25 +25,26 @@ def _read_deck() -> list[int]:
         lines = [l.strip() for l in f if l.strip() and not l.startswith('#')]
     return [int(x) for x in lines[:60]]
 
-
-def relu(x: np.ndarray) -> np.ndarray:
-    return np.maximum(0.0, x)
-
-
-def _numpy_forward(state: np.ndarray, w: dict) -> np.ndarray:
-    """Pure-NumPy actor forward pass matching train_ppo_parallel.py ActorCritic."""
-    x = relu(state @ w['s1_w'].T + w['s1_b'])
-    x = relu(x    @ w['s2_w'].T + w['s2_b'])
-    logits = x @ w['a_w'].T + w['a_b']
-    return logits
-
+class Actor(nn.Module):
+    """Lightweight PyTorch Actor for inference."""
+    def __init__(self, state_dim, action_dim, hidden=256):
+        super().__init__()
+        self.shared = nn.Sequential(
+            nn.Linear(state_dim, hidden), nn.ReLU(),
+            nn.Linear(hidden, hidden),   nn.ReLU(),
+        )
+        self.actor  = nn.Linear(hidden, action_dim)
+        
+    def forward(self, x):
+        h = self.shared(x)
+        return self.actor(h)
 
 def policy_agent(obs_dict: dict) -> list[int]:
     """
     Kaggle entrypoint. Called every turn.
     Turn 0: return deck. Every other turn: return action indices.
     """
-    global _encoder, _weights
+    global _encoder, _model
 
     # ── Turn 0: submit deck ──
     step = obs_dict.get("step", 1) if obs_dict else 0
@@ -61,31 +63,32 @@ def policy_agent(obs_dict: dict) -> list[int]:
     if _encoder is None:
         _encoder = ObservationEncoder()
 
-    if _weights is None:
+    if _model is None:
+        _model = Actor(ObservationEncoder.STATE_DIM, MAX_ACTION_SPACE)
+        loaded = False
+        
         for candidate in [
-            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "models", "ppo_weights.npz"),
-            "/kaggle_simulations/agent/models/ppo_weights.npz",
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "models", "ppo_phase3.pth"),
+            "/kaggle_simulations/agent/models/ppo_phase3.pth",
         ]:
             if os.path.exists(candidate):
-                _weights = dict(np.load(candidate))
-                break
-
-        if _weights is None:
-            # Fallback: random weights (better than crashing)
-            H, S = 256, ObservationEncoder.STATE_DIM
-            _weights = {
-                's1_w': np.random.randn(H, S).astype(np.float32) * 0.01,
-                's1_b': np.zeros(H, dtype=np.float32),
-                's2_w': np.random.randn(H, H).astype(np.float32) * 0.01,
-                's2_b': np.zeros(H, dtype=np.float32),
-                'a_w':  np.random.randn(MAX_ACTION_SPACE, H).astype(np.float32) * 0.01,
-                'a_b':  np.zeros(MAX_ACTION_SPACE, dtype=np.float32),
-            }
+                try:
+                    # We load state_dict. The checkpoint comes from ActorCritic which has 'shared' and 'actor' and 'critic'.
+                    # PyTorch load_state_dict with strict=False will load 'shared' and 'actor' weights perfectly!
+                    _model.load_state_dict(torch.load(candidate, map_location='cpu', weights_only=True), strict=False)
+                    loaded = True
+                    break
+                except Exception as e:
+                    print(f"Failed to load {candidate}: {e}")
+                    
+        _model.eval()
 
     # ── Encode + forward + mask sample ──
     try:
         state = _encoder.encode(obs_dict)
-        logits = _numpy_forward(state, _weights)
+        state_t = torch.FloatTensor(state).unsqueeze(0)
+        with torch.no_grad():
+            logits = _model(state_t).squeeze(0).numpy()
         return sample_valid_action(logits, obs_dict)
     except Exception:
         # Failsafe: never crash — return first legal action

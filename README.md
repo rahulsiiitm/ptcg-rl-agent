@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="PTCG AI Battle Agent" width="100%"/>
+  <img src="docs/banner.png" alt="PTCG AI Battle Agent" width="100%"/>
 </p>
 
 <h1 align="center">🃏 PTCG AI Battle Agent</h1>
@@ -21,7 +21,7 @@
   <a href="https://gymnasium.farama.org/">
     <img src="https://img.shields.io/badge/Gymnasium-RL%20Env-3CBAC0?style=for-the-badge" alt="Gymnasium"/>
   </a>
-  <img src="https://img.shields.io/badge/Phase-2%20Deployed-22C55E?style=for-the-badge" alt="Phase 2"/>
+  <img src="https://img.shields.io/badge/Phase-3%20Scaling-22C55E?style=for-the-badge" alt="Phase 3"/>
   <img src="https://img.shields.io/badge/Best%20Score-303.6-FFD700?style=for-the-badge&logo=star&logoColor=black" alt="Score"/>
 </p>
 
