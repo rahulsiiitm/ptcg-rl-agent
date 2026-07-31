@@ -1,0 +1,2 @@
+class PolicyNetwork:
+    pass
