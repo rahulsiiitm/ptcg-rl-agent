@@ -54,13 +54,16 @@ Effect Explanation. Loaded via `data/card_lookup.py`. Do not redistribute this f
 outside the project — it's subject to competition rules.
 
 ## Architecture
-- `src/env/wrapper.py` — Gymnasium-style wrapper around the cabt engine.
-- `src/agent/rule_based.py` — Phase 1 heuristic agent (build/ship first).
-- `src/agent/policy.py` — Phase 2 RL policy (PPO), built after Phase 1 ladders.
+- `src/env/fast_sim.py` — Gymnasium wrapper around the C++ `cg` engine (bypasses slow kaggle_environments).
+- `src/agent/rule_based.py` — Phase 1 heuristic agent (deployed, baseline).
+- `src/agent/policy.py` — Phase 2 RL policy. Pure NumPy inference; trained with PyTorch locally.
+- `src/agent/state_encoder.py` — Encodes cabt JSON obs → 24-dim float32 vector.
+- `src/agent/action_mask.py` — NumPy softmax + masked sampling over variable-length legal moves.
 - `src/agent/opponent_model.py` — tracks played/discarded/revealed cards to 
   maintain a running probability estimate over the opponent's remaining deck/hand.
 - `src/env/reward.py` — shaped reward (win/loss + prizes taken + KOs + board 
   advantage), isolated from the training loop for independent iteration.
+- `src/train/train_ppo.py` — PPO Actor-Critic (MLP 24→128→128→150). 1-step TD, Adam, CUDA.
 - `src/train/self_play.py` — checkpoint pool + `rule_based.py` kept as a permanent 
   self-play opponent, to avoid overfitting to self-play only.
 
@@ -76,9 +79,23 @@ outside the project — it's subject to competition rules.
 - Never promote a Phase 2 agent to `main.py` unless its real ladder score beats 
   the Phase 1 rule-based baseline's real ladder score.
 
+## Critical Runtime Fact
+
+The `cabt` Kaggle environment is built `FROM gcr.io/kaggle-images/python:v163` (the full Kaggle
+Python image). PyTorch, NumPy, scikit-learn, and all standard ML libraries ARE available at
+runtime. Crashes observed in Phase 2 were **Turn 0 deck-submission bugs**, not missing imports.
+
+- **Phase 2 fix**: Agent now returns `_read_deck()` when `step == 0` (Turn 0).
+- **Phase 3**: Can safely `import torch` and load `.pth` weights directly inside `policy.py`.
+
 ## Current status
-Not started. Dataset not yet downloaded. Next action: download `EN_Card_Data.csv` 
-from the competition's dataset tab into `data/`, then begin Phase 0.
+
+Phase 2 deployed. RL pipeline (PPO, NumPy inference, Gymnasium env wrapper) is functional and
+successfully running matches on Kaggle. Phase 3 (at-scale self-play + competitive deck) next.
+
+- Real ladder rating after Phase 2 submission: **TBD** (awaiting scoring)
+- Phase 1 baseline (rule-based): **~300 ladder rating**
+- Phase 3 must beat 300 on the real ladder before being promoted to `main.py`.
 
 ## Local Hardware Specs
 - CPU: AMD Ryzen 5 5600H (12 logical cores)
