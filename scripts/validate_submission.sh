@@ -6,7 +6,7 @@ python -c "
 from kaggle_environments import make
 from main import agent
 
-with open('decks/deck.csv') as f:
+with open('deck.csv') as f:
     deck = [int(line.strip()) for line in f.readlines() if line.strip()]
 
 env = make('cabt', configuration={'decks': [deck, deck]})

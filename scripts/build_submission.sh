@@ -2,9 +2,5 @@
 # Builds the submission.tar.gz for Kaggle
 
 echo "Building submission..."
-# Copy the finalized deck to the root temporarily for the tarball
-cp decks/deck.csv ./deck.csv
-tar -czvf submission.tar.gz main.py deck.csv src/
-# Clean up
-rm ./deck.csv
+tar -czvf submission.tar.gz main.py deck.csv src/ models/ppo_weights.npz LICENSE
 echo "Done. submission.tar.gz created."
