@@ -93,9 +93,9 @@ runtime. Crashes observed in Phase 2 were **Turn 0 deck-submission bugs**, not m
 Phase 2 deployed. RL pipeline (PPO, NumPy inference, Gymnasium env wrapper) is functional and
 successfully running matches on Kaggle. Phase 3 (at-scale self-play + competitive deck) next.
 
-- Real ladder rating after Phase 2 submission: **TBD** (awaiting scoring)
-- Phase 1 baseline (rule-based): **~300 ladder rating**
-- Phase 3 must beat 300 on the real ladder before being promoted to `main.py`.
+- Real ladder rating after Phase 2 (Pure Numpy Fix) submission: **303.6**
+- Phase 1 v3 baseline (rule-based, first working): **170.1**
+- Phase 3 target: beat **303.6** on the real ladder before promoting to `main.py`.
 
 ## Local Hardware Specs
 - CPU: AMD Ryzen 5 5600H (12 logical cores)

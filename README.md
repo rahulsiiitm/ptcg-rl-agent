@@ -84,9 +84,9 @@ kaggle competitions submit -c pokemon-tcg-ai-battle -f submission.tar.gz -m "mes
 | Phase | Status | Description |
 |---|---|---|
 | **Phase 0** — Deck Selection | ✅ Complete | Mono-Water deck (4x Squirtle, 4x Staryu, 4x Poliwag, 48x Water Energy). Strictly legal 60-card deck. |
-| **Phase 1** — Rule-Based Agent | ✅ Complete | `rule_based_agent` in `src/agent/rule_based.py`. Heuristic priority ordering: Attack > Evolve > Play > Attach > End. Reached ~300 ladder rating. |
-| **Phase 2** — RL Pipeline | ✅ Deployed | PPO (`ActorCritic` in `train_ppo.py`) trained locally with CUDA. Weights exported to pure-NumPy (no PyTorch dependency at inference time) to avoid Kaggle container crashes. See details below. |
-| **Phase 3** — At-Scale Self-Play | 🔄 In Preparation | Multiprocessing parallel envs, self-play checkpoint pool, competitive deck upgrade. |
+| **Phase 1** — Rule-Based Agent | ✅ Complete | `rule_based_agent`. Heuristic: Attack > Evolve > Play > Attach > End. First working submission scored **170.1**. |
+| **Phase 2** — RL Pipeline | ✅ Deployed | PPO trained locally with CUDA. Pure-NumPy inference at Kaggle runtime. Scored **303.6** — current best. |
+| **Phase 3** — At-Scale Self-Play | 🔄 Next | Multiprocessing parallel envs, self-play checkpoint pool, competitive deck upgrade. Target: beat 303.6. |
 
 ---
 
