@@ -31,6 +31,14 @@ class FastPTCGEnv(gym.Env):
         """Allows swapping the opponent agent dynamically (e.g. for self-play pool)."""
         self.opponent_agent = agent_fn
         
+    def set_opponent_deck(self, opp_deck):
+        """Allows swapping the opponent deck dynamically (e.g. to train against multiple meta decks)."""
+        self.opp_deck = opp_deck
+        
+    def set_rl_deck(self, rl_deck):
+        """Allows swapping the RL agent's deck dynamically to learn generalized strategies."""
+        self.rl_deck = rl_deck
+        
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         obs, sd = battle_start(self.rl_deck, self.opp_deck)

@@ -50,6 +50,12 @@ def _load_deck_from_csv(path="deck.csv"):
         return [int(line.strip()) for line in f if line.strip() and not line.startswith("#")]
 SNORLAX_DECK = _load_deck_from_csv()
 
+OPPONENT_DECKS = [SNORLAX_DECK]
+import glob
+for p in glob.glob("decks/opp_deck_*.csv"):
+    OPPONENT_DECKS.append(_load_deck_from_csv(p))
+ALL_DECKS = OPPONENT_DECKS
+
 # ─── Model ────────────────────────────────────────────────────────────────────
 
 class ActorCritic(nn.Module):
@@ -69,7 +75,7 @@ class ActorCritic(nn.Module):
 
 # ─── Worker process ───────────────────────────────────────────────────────────
 
-def env_worker(worker_id: int, conn: mp.connection.Connection, rl_deck: list, opp_deck: list):
+def env_worker(worker_id: int, conn: mp.connection.Connection, all_decks: list):
     """
     Each worker owns one environment. Protocol:
       - Receives action list from main process
@@ -80,9 +86,10 @@ def env_worker(worker_id: int, conn: mp.connection.Connection, rl_deck: list, op
     sys.path.append(os.getcwd())
     from src.env.fast_sim import FastPTCGEnv
     from src.train.self_play import SelfPlayPool
+    import random
 
     pool = SelfPlayPool()
-    env = FastPTCGEnv(rl_deck=rl_deck, opp_deck=opp_deck)
+    env = FastPTCGEnv(rl_deck=random.choice(all_decks), opp_deck=random.choice(all_decks))
     env.set_opponent_agent(pool.sample_opponent())
     obs, _ = env.reset()
     conn.send(('obs', obs))
@@ -90,6 +97,8 @@ def env_worker(worker_id: int, conn: mp.connection.Connection, rl_deck: list, op
     while True:
         msg = conn.recv()
         if msg == 'reset':
+            env.set_rl_deck(random.choice(all_decks))
+            env.set_opponent_deck(random.choice(all_decks))
             env.set_opponent_agent(pool.sample_opponent())
             obs, _ = env.reset()
             conn.send(('obs', obs))
@@ -145,7 +154,7 @@ def train():
         parent_conn, child_conn = Pipe()
         p = Process(
             target=env_worker,
-            args=(i, child_conn, SNORLAX_DECK, SNORLAX_DECK),
+            args=(i, child_conn, ALL_DECKS),
             daemon=True
         )
         p.start()
