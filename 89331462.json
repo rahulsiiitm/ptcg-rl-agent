@@ -1,0 +1,1566 @@
+{
+  "configuration": {
+    "actTimeout": 0,
+    "episodeSteps": 10000000,
+    "runTimeout": 2000,
+    "seed": 0
+  },
+  "description": "Limited Card Battle.",
+  "id": "6e7961a4-8daa-11f1-bab5-0242ac130203",
+  "info": {
+    "Agents": [
+      {
+        "Name": "Rahul Sharma",
+        "ThumbnailUrl": null
+      },
+      {
+        "Name": "Rahul Sharma",
+        "ThumbnailUrl": null
+      }
+    ],
+    "EpisodeId": 89331462,
+    "LiveVideoPath": null,
+    "TeamNames": [
+      "Rahul Sharma",
+      "Rahul Sharma"
+    ]
+  },
+  "module_version": "1.32.2",
+  "name": "cabt",
+  "rewards": [
+    1,
+    null
+  ],
+  "schema_version": 1,
+  "specification": {
+    "action": {
+      "default": [],
+      "description": "List of option index.",
+      "type": "array"
+    },
+    "agents": [
+      2
+    ],
+    "configuration": {
+      "actTimeout": {
+        "default": 0,
+        "description": "Maximum runtime (seconds) to obtain an action from an agent.",
+        "minimum": 0,
+        "type": "number"
+      },
+      "episodeSteps": {
+        "default": 10000000,
+        "description": "Maximum number of steps in the episode.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "runTimeout": {
+        "default": 2000,
+        "description": "Maximum runtime (seconds) of an episode (not necessarily DONE).",
+        "minimum": 0,
+        "type": "number"
+      }
+    },
+    "info": {},
+    "observation": {
+      "remainingOverageTime": {
+        "default": 600,
+        "description": "Total remaining banked time (seconds) that can be used in excess of per-step actTimeouts -- agent is disqualified with TIMEOUT status when this drops below 0.",
+        "minimum": 0,
+        "shared": false,
+        "type": "number"
+      },
+      "step": {
+        "default": 0,
+        "description": "Current step within the episode.",
+        "minimum": 0,
+        "shared": true,
+        "type": "integer"
+      }
+    },
+    "reward": {
+      "default": 0,
+      "description": "Lost:-1, Won:1, Draw:0",
+      "enum": [
+        -1,
+        0,
+        1
+      ],
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "statuses": [
+    "DONE",
+    "INVALID"
+  ],
+  "steps": [
+    [
+      {
+        "action": [],
+        "info": {},
+        "observation": {
+          "current": null,
+          "logs": [],
+          "remainingOverageTime": 600,
+          "search_begin_input": null,
+          "select": null,
+          "step": 0
+        },
+        "reward": 0,
+        "status": "ACTIVE",
+        "visualize": [
+          {
+            "action": [
+              [
+                268,
+                268,
+                268,
+                268,
+                269,
+                269,
+                269,
+                269,
+                270,
+                270,
+                271,
+                271,
+                1086,
+                1086,
+                1086,
+                1086,
+                1121,
+                1121,
+                1121,
+                1121,
+                1182,
+                1182,
+                1182,
+                1182,
+                1224,
+                1224,
+                1224,
+                1224,
+                1123,
+                1123,
+                1123,
+                1123,
+                1124,
+                1124,
+                1124,
+                1124,
+                1125,
+                1083,
+                1174,
+                1174,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4
+              ],
+              [
+                268,
+                268,
+                268,
+                268,
+                269,
+                269,
+                269,
+                269,
+                270,
+                270,
+                271,
+                271,
+                1086,
+                1086,
+                1086,
+                1086,
+                1121,
+                1121,
+                1121,
+                1121,
+                1182,
+                1182,
+                1182,
+                1182,
+                1224,
+                1224,
+                1224,
+                1224,
+                1123,
+                1123,
+                1123,
+                1123,
+                1124,
+                1124,
+                1124,
+                1124,
+                1125,
+                1083,
+                1174,
+                1174,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4
+              ]
+            ],
+            "current": {
+              "energyAttached": false,
+              "firstPlayer": -1,
+              "looking": null,
+              "lookingCount": 0,
+              "players": [
+                {
+                  "active": [],
+                  "asleep": false,
+                  "bench": [],
+                  "benchMax": 5,
+                  "burned": false,
+                  "confused": false,
+                  "deck": [
+                    {
+                      "id": 1086,
+                      "name": "Buddy-Buddy Poffin",
+                      "playerIndex": 0,
+                      "serial": 18
+                    },
+                    {
+                      "id": 271,
+                      "name": "Iono’s Kilowattrel",
+                      "playerIndex": 0,
+                      "serial": 13
+                    },
+                    {
+                      "id": 1182,
+                      "name": "Boss’s Orders",
+                      "playerIndex": 0,
+                      "serial": 26
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 44
+                    },
+                    {
+                      "id": 270,
+                      "name": "Iono’s Wattrel",
+                      "playerIndex": 0,
+                      "serial": 12
+                    },
+                    {
+                      "id": 1124,
+                      "name": "Pokémon Catcher",
+                      "playerIndex": 0,
+                      "serial": 38
+                    },
+                    {
+                      "id": 269,
+                      "name": "Iono’s Bellibolt ex",
+                      "playerIndex": 0,
+                      "serial": 9
+                    },
+                    {
+                      "id": 1174,
+                      "name": "Air Balloon",
+                      "playerIndex": 0,
+                      "serial": 41
+                    },
+                    {
+                      "id": 1123,
+                      "name": "Switch",
+                      "playerIndex": 0,
+                      "serial": 31
+                    },
+                    {
+                      "id": 1086,
+                      "name": "Buddy-Buddy Poffin",
+                      "playerIndex": 0,
+                      "serial": 15
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 58
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 52
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 54
+                    },
+                    {
+                      "id": 268,
+                      "name": "Iono’s Tadbulb",
+                      "playerIndex": 0,
+                      "serial": 5
+                    },
+                    {
+                      "id": 1124,
+                      "name": "Pokémon Catcher",
+                      "playerIndex": 0,
+                      "serial": 36
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 47
+                    },
+                    {
+                      "id": 1086,
+                      "name": "Buddy-Buddy Poffin",
+                      "playerIndex": 0,
+                      "serial": 16
+                    },
+                    {
+                      "id": 1121,
+                      "name": "Ultra Ball",
+                      "playerIndex": 0,
+                      "serial": 19
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 50
+                    },
+                    {
+                      "id": 268,
+                      "name": "Iono’s Tadbulb",
+                      "playerIndex": 0,
+                      "serial": 4
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 45
+                    },
+                    {
+                      "id": 271,
+                      "name": "Iono’s Kilowattrel",
+                      "playerIndex": 0,
+                      "serial": 14
+                    },
+                    {
+                      "id": 269,
+                      "name": "Iono’s Bellibolt ex",
+                      "playerIndex": 0,
+                      "serial": 7
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 59
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 56
+                    },
+                    {
+                      "id": 1182,
+                      "name": "Boss’s Orders",
+                      "playerIndex": 0,
+                      "serial": 25
+                    },
+                    {
+                      "id": 1121,
+                      "name": "Ultra Ball",
+                      "playerIndex": 0,
+                      "serial": 22
+                    },
+                    {
+                      "id": 1182,
+                      "name": "Boss’s Orders",
+                      "playerIndex": 0,
+                      "serial": 23
+                    },
+                    {
+                      "id": 1124,
+                      "name": "Pokémon Catcher",
+                      "playerIndex": 0,
+                      "serial": 37
+                    },
+                    {
+                      "id": 1224,
+                      "name": "Cheren",
+                      "playerIndex": 0,
+                      "serial": 30
+                    },
+                    {
+                      "id": 1123,
+                      "name": "Switch",
+                      "playerIndex": 0,
+                      "serial": 32
+                    },
+                    {
+                      "id": 1123,
+                      "name": "Switch",
+                      "playerIndex": 0,
+                      "serial": 34
+                    },
+                    {
+                      "id": 1123,
+                      "name": "Switch",
+                      "playerIndex": 0,
+                      "serial": 33
+                    },
+                    {
+                      "id": 270,
+                      "name": "Iono’s Wattrel",
+                      "playerIndex": 0,
+                      "serial": 11
+                    },
+                    {
+                      "id": 1125,
+                      "name": "Master Ball",
+                      "playerIndex": 0,
+                      "serial": 39
+                    },
+                    {
+                      "id": 269,
+                      "name": "Iono’s Bellibolt ex",
+                      "playerIndex": 0,
+                      "serial": 10
+                    },
+                    {
+                      "id": 1121,
+                      "name": "Ultra Ball",
+                      "playerIndex": 0,
+                      "serial": 20
+                    },
+                    {
+                      "id": 1224,
+                      "name": "Cheren",
+                      "playerIndex": 0,
+                      "serial": 27
+                    },
+                    {
+                      "id": 1086,
+                      "name": "Buddy-Buddy Poffin",
+                      "playerIndex": 0,
+                      "serial": 17
+                    },
+                    {
+                      "id": 1121,
+                      "name": "Ultra Ball",
+                      "playerIndex": 0,
+                      "serial": 21
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 61
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 51
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 46
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 57
+                    },
+                    {
+                      "id": 1174,
+                      "name": "Air Balloon",
+                      "playerIndex": 0,
+                      "serial": 42
+                    },
+                    {
+                      "id": 269,
+                      "name": "Iono’s Bellibolt ex",
+                      "playerIndex": 0,
+                      "serial": 8
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 53
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 60
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 43
+                    },
+                    {
+                      "id": 1124,
+                      "name": "Pokémon Catcher",
+                      "playerIndex": 0,
+                      "serial": 35
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 62
+                    },
+                    {
+                      "id": 1224,
+                      "name": "Cheren",
+                      "playerIndex": 0,
+                      "serial": 28
+                    },
+                    {
+                      "id": 268,
+                      "name": "Iono’s Tadbulb",
+                      "playerIndex": 0,
+                      "serial": 6
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 55
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 48
+                    },
+                    {
+                      "id": 268,
+                      "name": "Iono’s Tadbulb",
+                      "playerIndex": 0,
+                      "serial": 3
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 49
+                    },
+                    {
+                      "id": 1224,
+                      "name": "Cheren",
+                      "playerIndex": 0,
+                      "serial": 29
+                    },
+                    {
+                      "id": 1182,
+                      "name": "Boss’s Orders",
+                      "playerIndex": 0,
+                      "serial": 24
+                    },
+                    {
+                      "id": 1083,
+                      "name": "Love Ball",
+                      "playerIndex": 0,
+                      "serial": 40
+                    }
+                  ],
+                  "deckCount": 60,
+                  "discard": [],
+                  "hand": [],
+                  "handCount": 0,
+                  "paralyzed": false,
+                  "poisoned": false,
+                  "prize": []
+                },
+                {
+                  "active": [],
+                  "asleep": false,
+                  "bench": [],
+                  "benchMax": 5,
+                  "burned": false,
+                  "confused": false,
+                  "deck": [
+                    {
+                      "id": 1124,
+                      "name": "Pokémon Catcher",
+                      "playerIndex": 1,
+                      "serial": 98
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 106
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 112
+                    },
+                    {
+                      "id": 1124,
+                      "name": "Pokémon Catcher",
+                      "playerIndex": 1,
+                      "serial": 97
+                    },
+                    {
+                      "id": 271,
+                      "name": "Iono’s Kilowattrel",
+                      "playerIndex": 1,
+                      "serial": 74
+                    },
+                    {
+                      "id": 1123,
+                      "name": "Switch",
+                      "playerIndex": 1,
+                      "serial": 94
+                    },
+                    {
+                      "id": 1086,
+                      "name": "Buddy-Buddy Poffin",
+                      "playerIndex": 1,
+                      "serial": 78
+                    },
+                    {
+                      "id": 271,
+                      "name": "Iono’s Kilowattrel",
+                      "playerIndex": 1,
+                      "serial": 73
+                    },
+                    {
+                      "id": 1224,
+                      "name": "Cheren",
+                      "playerIndex": 1,
+                      "serial": 90
+                    },
+                    {
+                      "id": 1121,
+                      "name": "Ultra Ball",
+                      "playerIndex": 1,
+                      "serial": 82
+                    },
+                    {
+                      "id": 1224,
+                      "name": "Cheren",
+                      "playerIndex": 1,
+                      "serial": 89
+                    },
+                    {
+                      "id": 1125,
+                      "name": "Master Ball",
+                      "playerIndex": 1,
+                      "serial": 99
+                    },
+                    {
+                      "id": 269,
+                      "name": "Iono’s Bellibolt ex",
+                      "playerIndex": 1,
+                      "serial": 67
+                    },
+                    {
+                      "id": 270,
+                      "name": "Iono’s Wattrel",
+                      "playerIndex": 1,
+                      "serial": 72
+                    },
+                    {
+                      "id": 268,
+                      "name": "Iono’s Tadbulb",
+                      "playerIndex": 1,
+                      "serial": 65
+                    },
+                    {
+                      "id": 269,
+                      "name": "Iono’s Bellibolt ex",
+                      "playerIndex": 1,
+                      "serial": 70
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 105
+                    },
+                    {
+                      "id": 269,
+                      "name": "Iono’s Bellibolt ex",
+                      "playerIndex": 1,
+                      "serial": 68
+                    },
+                    {
+                      "id": 1224,
+                      "name": "Cheren",
+                      "playerIndex": 1,
+                      "serial": 87
+                    },
+                    {
+                      "id": 270,
+                      "name": "Iono’s Wattrel",
+                      "playerIndex": 1,
+                      "serial": 71
+                    },
+                    {
+                      "id": 1123,
+                      "name": "Switch",
+                      "playerIndex": 1,
+                      "serial": 92
+                    },
+                    {
+                      "id": 268,
+                      "name": "Iono’s Tadbulb",
+                      "playerIndex": 1,
+                      "serial": 64
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 119
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 110
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 122
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 104
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 103
+                    },
+                    {
+                      "id": 268,
+                      "name": "Iono’s Tadbulb",
+                      "playerIndex": 1,
+                      "serial": 63
+                    },
+                    {
+                      "id": 1224,
+                      "name": "Cheren",
+                      "playerIndex": 1,
+                      "serial": 88
+                    },
+                    {
+                      "id": 1124,
+                      "name": "Pokémon Catcher",
+                      "playerIndex": 1,
+                      "serial": 96
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 107
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 117
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 108
+                    },
+                    {
+                      "id": 268,
+                      "name": "Iono’s Tadbulb",
+                      "playerIndex": 1,
+                      "serial": 66
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 114
+                    },
+                    {
+                      "id": 1086,
+                      "name": "Buddy-Buddy Poffin",
+                      "playerIndex": 1,
+                      "serial": 75
+                    },
+                    {
+                      "id": 1182,
+                      "name": "Boss’s Orders",
+                      "playerIndex": 1,
+                      "serial": 83
+                    },
+                    {
+                      "id": 1124,
+                      "name": "Pokémon Catcher",
+                      "playerIndex": 1,
+                      "serial": 95
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 115
+                    },
+                    {
+                      "id": 1123,
+                      "name": "Switch",
+                      "playerIndex": 1,
+                      "serial": 91
+                    },
+                    {
+                      "id": 1083,
+                      "name": "Love Ball",
+                      "playerIndex": 1,
+                      "serial": 100
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 116
+                    },
+                    {
+                      "id": 1086,
+                      "name": "Buddy-Buddy Poffin",
+                      "playerIndex": 1,
+                      "serial": 77
+                    },
+                    {
+                      "id": 1182,
+                      "name": "Boss’s Orders",
+                      "playerIndex": 1,
+                      "serial": 85
+                    },
+                    {
+                      "id": 1121,
+                      "name": "Ultra Ball",
+                      "playerIndex": 1,
+                      "serial": 80
+                    },
+                    {
+                      "id": 1174,
+                      "name": "Air Balloon",
+                      "playerIndex": 1,
+                      "serial": 102
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 118
+                    },
+                    {
+                      "id": 1123,
+                      "name": "Switch",
+                      "playerIndex": 1,
+                      "serial": 93
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 120
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 113
+                    },
+                    {
+                      "id": 1182,
+                      "name": "Boss’s Orders",
+                      "playerIndex": 1,
+                      "serial": 84
+                    },
+                    {
+                      "id": 1182,
+                      "name": "Boss’s Orders",
+                      "playerIndex": 1,
+                      "serial": 86
+                    },
+                    {
+                      "id": 1086,
+                      "name": "Buddy-Buddy Poffin",
+                      "playerIndex": 1,
+                      "serial": 76
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 121
+                    },
+                    {
+                      "id": 1174,
+                      "name": "Air Balloon",
+                      "playerIndex": 1,
+                      "serial": 101
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 109
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 111
+                    },
+                    {
+                      "id": 1121,
+                      "name": "Ultra Ball",
+                      "playerIndex": 1,
+                      "serial": 81
+                    },
+                    {
+                      "id": 1121,
+                      "name": "Ultra Ball",
+                      "playerIndex": 1,
+                      "serial": 79
+                    },
+                    {
+                      "id": 269,
+                      "name": "Iono’s Bellibolt ex",
+                      "playerIndex": 1,
+                      "serial": 69
+                    }
+                  ],
+                  "deckCount": 60,
+                  "discard": [],
+                  "hand": [],
+                  "handCount": 0,
+                  "paralyzed": false,
+                  "poisoned": false,
+                  "prize": []
+                }
+              ],
+              "result": -1,
+              "retreated": false,
+              "stadium": [],
+              "stadiumPlayed": false,
+              "supporterPlayed": false,
+              "turn": 0,
+              "turnActionCount": 1,
+              "yourIndex": 0
+            },
+            "logs": [],
+            "obs": {
+              "current": null,
+              "logs": [],
+              "remainingOverageTime": 600,
+              "select": null,
+              "step": 0
+            },
+            "select": {
+              "context": "IsFirst",
+              "contextCard": null,
+              "deck": null,
+              "effect": null,
+              "maxCount": 1,
+              "minCount": 1,
+              "option": [
+                {
+                  "type": "Yes"
+                },
+                {
+                  "type": "No"
+                }
+              ],
+              "remainDamageCounter": 0,
+              "remainEnergyCost": 0,
+              "type": "YesNo"
+            },
+            "selected": null,
+            "ver": 2
+          },
+          {
+            "action": [
+              [
+                0
+              ],
+              []
+            ],
+            "current": {
+              "energyAttached": false,
+              "firstPlayer": 0,
+              "looking": null,
+              "lookingCount": 0,
+              "players": [
+                {
+                  "active": [],
+                  "asleep": false,
+                  "bench": [],
+                  "benchMax": 5,
+                  "burned": false,
+                  "confused": false,
+                  "deck": [
+                    {
+                      "id": 1086,
+                      "name": "Buddy-Buddy Poffin",
+                      "playerIndex": 0,
+                      "serial": 18
+                    },
+                    {
+                      "id": 271,
+                      "name": "Iono’s Kilowattrel",
+                      "playerIndex": 0,
+                      "serial": 13
+                    },
+                    {
+                      "id": 1182,
+                      "name": "Boss’s Orders",
+                      "playerIndex": 0,
+                      "serial": 26
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 44
+                    },
+                    {
+                      "id": 270,
+                      "name": "Iono’s Wattrel",
+                      "playerIndex": 0,
+                      "serial": 12
+                    },
+                    {
+                      "id": 1124,
+                      "name": "Pokémon Catcher",
+                      "playerIndex": 0,
+                      "serial": 38
+                    },
+                    {
+                      "id": 269,
+                      "name": "Iono’s Bellibolt ex",
+                      "playerIndex": 0,
+                      "serial": 9
+                    },
+                    {
+                      "id": 1174,
+                      "name": "Air Balloon",
+                      "playerIndex": 0,
+                      "serial": 41
+                    },
+                    {
+                      "id": 1123,
+                      "name": "Switch",
+                      "playerIndex": 0,
+                      "serial": 31
+                    },
+                    {
+                      "id": 1086,
+                      "name": "Buddy-Buddy Poffin",
+                      "playerIndex": 0,
+                      "serial": 15
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 58
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 52
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 54
+                    },
+                    {
+                      "id": 268,
+                      "name": "Iono’s Tadbulb",
+                      "playerIndex": 0,
+                      "serial": 5
+                    },
+                    {
+                      "id": 1124,
+                      "name": "Pokémon Catcher",
+                      "playerIndex": 0,
+                      "serial": 36
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 47
+                    },
+                    {
+                      "id": 1086,
+                      "name": "Buddy-Buddy Poffin",
+                      "playerIndex": 0,
+                      "serial": 16
+                    },
+                    {
+                      "id": 1121,
+                      "name": "Ultra Ball",
+                      "playerIndex": 0,
+                      "serial": 19
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 50
+                    },
+                    {
+                      "id": 268,
+                      "name": "Iono’s Tadbulb",
+                      "playerIndex": 0,
+                      "serial": 4
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 45
+                    },
+                    {
+                      "id": 271,
+                      "name": "Iono’s Kilowattrel",
+                      "playerIndex": 0,
+                      "serial": 14
+                    },
+                    {
+                      "id": 269,
+                      "name": "Iono’s Bellibolt ex",
+                      "playerIndex": 0,
+                      "serial": 7
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 59
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 56
+                    },
+                    {
+                      "id": 1182,
+                      "name": "Boss’s Orders",
+                      "playerIndex": 0,
+                      "serial": 25
+                    },
+                    {
+                      "id": 1121,
+                      "name": "Ultra Ball",
+                      "playerIndex": 0,
+                      "serial": 22
+                    },
+                    {
+                      "id": 1182,
+                      "name": "Boss’s Orders",
+                      "playerIndex": 0,
+                      "serial": 23
+                    },
+                    {
+                      "id": 1124,
+                      "name": "Pokémon Catcher",
+                      "playerIndex": 0,
+                      "serial": 37
+                    },
+                    {
+                      "id": 1224,
+                      "name": "Cheren",
+                      "playerIndex": 0,
+                      "serial": 30
+                    },
+                    {
+                      "id": 1123,
+                      "name": "Switch",
+                      "playerIndex": 0,
+                      "serial": 32
+                    },
+                    {
+                      "id": 1123,
+                      "name": "Switch",
+                      "playerIndex": 0,
+                      "serial": 34
+                    },
+                    {
+                      "id": 1123,
+                      "name": "Switch",
+                      "playerIndex": 0,
+                      "serial": 33
+                    },
+                    {
+                      "id": 270,
+                      "name": "Iono’s Wattrel",
+                      "playerIndex": 0,
+                      "serial": 11
+                    },
+                    {
+                      "id": 1125,
+                      "name": "Master Ball",
+                      "playerIndex": 0,
+                      "serial": 39
+                    },
+                    {
+                      "id": 269,
+                      "name": "Iono’s Bellibolt ex",
+                      "playerIndex": 0,
+                      "serial": 10
+                    },
+                    {
+                      "id": 1121,
+                      "name": "Ultra Ball",
+                      "playerIndex": 0,
+                      "serial": 20
+                    },
+                    {
+                      "id": 1224,
+                      "name": "Cheren",
+                      "playerIndex": 0,
+                      "serial": 27
+                    },
+                    {
+                      "id": 1086,
+                      "name": "Buddy-Buddy Poffin",
+                      "playerIndex": 0,
+                      "serial": 17
+                    },
+                    {
+                      "id": 1121,
+                      "name": "Ultra Ball",
+                      "playerIndex": 0,
+                      "serial": 21
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 61
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 51
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 46
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 57
+                    },
+                    {
+                      "id": 1174,
+                      "name": "Air Balloon",
+                      "playerIndex": 0,
+                      "serial": 42
+                    },
+                    {
+                      "id": 269,
+                      "name": "Iono’s Bellibolt ex",
+                      "playerIndex": 0,
+                      "serial": 8
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 53
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 60
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 43
+                    },
+                    {
+                      "id": 1124,
+                      "name": "Pokémon Catcher",
+                      "playerIndex": 0,
+                      "serial": 35
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 62
+                    },
+                    {
+                      "id": 1224,
+                      "name": "Cheren",
+                      "playerIndex": 0,
+                      "serial": 28
+                    },
+                    {
+                      "id": 268,
+                      "name": "Iono’s Tadbulb",
+                      "playerIndex": 0,
+                      "serial": 6
+                    }
+                  ],
+                  "deckCount": 53,
+                  "discard": [],
+                  "hand": [
+                    {
+                      "id": 1083,
+                      "name": "Love Ball",
+                      "playerIndex": 0,
+                      "serial": 40
+                    },
+                    {
+                      "id": 1182,
+                      "name": "Boss’s Orders",
+                      "playerIndex": 0,
+                      "serial": 24
+                    },
+                    {
+                      "id": 1224,
+                      "name": "Cheren",
+                      "playerIndex": 0,
+                      "serial": 29
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 49
+                    },
+                    {
+                      "id": 268,
+                      "name": "Iono’s Tadbulb",
+                      "playerIndex": 0,
+                      "serial": 3
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 48
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 0,
+                      "serial": 55
+                    }
+                  ],
+                  "handCount": 7,
+                  "paralyzed": false,
+                  "poisoned": false,
+                  "prize": []
+                },
+                {
+                  "active": [],
+                  "asleep": false,
+                  "bench": [],
+                  "benchMax": 5,
+                  "burned": false,
+                  "confused": false,
+                  "deck": [
+                    {
+                      "id": 1124,
+                      "name": "Pokémon Catcher",
+                      "playerIndex": 1,
+                      "serial": 98
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 106
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 112
+                    },
+                    {
+                      "id": 1124,
+                      "name": "Pokémon Catcher",
+                      "playerIndex": 1,
+                      "serial": 97
+                    },
+                    {
+                      "id": 271,
+                      "name": "Iono’s Kilowattrel",
+                      "playerIndex": 1,
+                      "serial": 74
+                    },
+                    {
+                      "id": 1123,
+                      "name": "Switch",
+                      "playerIndex": 1,
+                      "serial": 94
+                    },
+                    {
+                      "id": 1086,
+                      "name": "Buddy-Buddy Poffin",
+                      "playerIndex": 1,
+                      "serial": 78
+                    },
+                    {
+                      "id": 271,
+                      "name": "Iono’s Kilowattrel",
+                      "playerIndex": 1,
+                      "serial": 73
+                    },
+                    {
+                      "id": 1224,
+                      "name": "Cheren",
+                      "playerIndex": 1,
+                      "serial": 90
+                    },
+                    {
+                      "id": 1121,
+                      "name": "Ultra Ball",
+                      "playerIndex": 1,
+                      "serial": 82
+                    },
+                    {
+                      "id": 1224,
+                      "name": "Cheren",
+                      "playerIndex": 1,
+                      "serial": 89
+                    },
+                    {
+                      "id": 1125,
+                      "name": "Master Ball",
+                      "playerIndex": 1,
+                      "serial": 99
+                    },
+                    {
+                      "id": 269,
+                      "name": "Iono’s Bellibolt ex",
+                      "playerIndex": 1,
+                      "serial": 67
+                    },
+                    {
+                      "id": 270,
+                      "name": "Iono’s Wattrel",
+                      "playerIndex": 1,
+                      "serial": 72
+                    },
+                    {
+                      "id": 268,
+                      "name": "Iono’s Tadbulb",
+                      "playerIndex": 1,
+                      "serial": 65
+                    },
+                    {
+                      "id": 269,
+                      "name": "Iono’s Bellibolt ex",
+                      "playerIndex": 1,
+                      "serial": 70
+                    },
+                    {
+                      "id": 4,
+                      "name": "Basic {L} Energy",
+                      "playerIndex": 1,
+                      "serial": 105
+                    },
+                    {
+                      "id": 269,
+                      "name": "Iono’s Bellibolt ex",
+                      "playerIndex": 1,
+                      "serial": 68
+                    },
+                    {
+                      "id": 1224,
+                      "name": "Cheren",
+                      "playerIndex": 1,
+                      "serial": 87
+                    },
+                    {
+                      "id": 270,
+                      "name": "Iono’s Wattrel",
+                      "playerIndex": 1,
+                      "serial": 71
+                    },
+                    {
+                      "id": 1123,
+                      "name": "Switch",
+                      "playerIndex": 1,
+                      "serial": 92
+                    }
