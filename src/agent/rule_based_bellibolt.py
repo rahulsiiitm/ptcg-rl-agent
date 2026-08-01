@@ -74,7 +74,30 @@ OPT_ABILITY = 10
 OPT_END     = 14
 
 SELECT_MAIN   = 0
+SELECT_CARD   = 1   # engine asks us to pick a card from a list
 SELECT_YES_NO = 9
+
+# ─── Integer context codes (real Kaggle cabt engine sends ints, not strings) ──
+# Mapped from observed episode JSONs + cabt docs
+CTX_SETUP_ACTIVE   = 1    # choose starting active Pokémon
+CTX_SETUP_BENCH    = 2    # choose bench Pokémon at game start
+CTX_TO_HAND        = 4    # choose card to put in hand (ball search result)
+CTX_DISCARD        = 5    # choose cards to discard (Ultra Ball cost)
+CTX_EFFECT_TARGET  = 6    # choose effect target (Boss's Orders, Catcher)
+CTX_SWITCH_IN      = 7    # choose Pokémon to switch into active
+CTX_BENCH_PLACE    = 8    # place a card onto bench mid-game
+CTX_DISCARD_ENERGY = 10   # choose energy to discard (Flashing Draw)
+CTX_SWITCH_SELF    = 11   # choose own Pokémon to switch/retreat to
+CTX_MAIN           = 0    # normal MAIN action turn
+# String aliases (some older/local cabt versions use these)
+_STR_CTX_SETUP_ACTIVE  = {"SETUPACTIVEPOKEMON", "SETUP_ACTIVE", "ISFIRST", "ISACTIVE"}
+_STR_CTX_SETUP_BENCH   = {"SETUPBENCHPOKEMON", "SETUP_BENCH", "BENCHPOKEMON"}
+_STR_CTX_TO_HAND       = {"TOHAND", "TO_HAND", "CARDSELECT", "SEARCHHAND"}
+_STR_CTX_DISCARD       = {"DISCARD", "DISCARD_COST", "DISCARDCARD"}
+_STR_CTX_EFFECT_TARGET = {"EFFECTTARGET", "EFFECT_TARGET", "BOSSTARGET", "GUSSTARGET"}
+_STR_CTX_SWITCH_IN     = {"SWITCHIN", "SWITCH_IN", "TO_ACTIVE", "TOACTIVE", "SWITCH"}
+_STR_CTX_BENCH_PLACE   = {"BENCHPLACE", "BENCH_PLACE", "PLAYTOBENCH"}
+_STR_CTX_DISCARD_ENERGY= {"DISCARDENERGY", "DISCARD_ENERGY"}
 
 # ─── File path helpers ────────────────────────────────────────────────────────
 def _read_deck() -> list[int]:
@@ -519,12 +542,149 @@ _state = {
 }
 
 
+def _ctx_matches(ctx, int_code: int, str_set: set) -> bool:
+    """Match select.context against both integer codes and legacy string names."""
+    if isinstance(ctx, int):
+        return ctx == int_code
+    return str(ctx).upper().replace(' ', '_') in str_set
+
+
+def _debug_log(step, ctx, stype, n_opts, result):
+    """Append one line to agent_debug.log for post-mortem analysis."""
+    try:
+        with open("agent_debug.log", "a") as f:
+            f.write(f"step={step} ctx={ctx} type={stype} n_opts={n_opts} -> {result}\n")
+    except Exception:
+        pass
+
+
+def _handle_card_select(select_data: dict, me: dict, opp: dict) -> list[int]:
+    """
+    Handle ALL type=1 (Card-select) sub-prompts.
+    The engine only offers legal cards — [0] is always safe, but we try to be smart.
+    THIS is the function that was missing, causing INVALID at step 21.
+    """
+    options  = select_data.get("option", [])
+    ctx      = select_data.get("context", "")
+    max_count = select_data.get("maxCount", 1)
+
+    if not options:
+        return []
+
+    # ── Setup active: choose starting active Pokémon ─────────────────────────
+    if _ctx_matches(ctx, CTX_SETUP_ACTIVE, _STR_CTX_SETUP_ACTIVE):
+        return _pick_setup_active(options)
+
+    # ── Setup bench: place Basics on bench at game start ──────────────────────
+    if _ctx_matches(ctx, CTX_SETUP_BENCH, _STR_CTX_SETUP_BENCH):
+        picks = _pick_setup_bench(options)
+        return picks[:max_count]
+
+    # ── Bench placement mid-game (e.g. Buddy-Buddy Poffin resolves) ───────────
+    if _ctx_matches(ctx, CTX_BENCH_PLACE, _STR_CTX_BENCH_PLACE):
+        # Prefer Tadbulb > Wattrel, pick up to max_count
+        priority = [TADBULB_ID, WATTREL_ID, KILOWATTREL_ID, BELLIBOLT_EX_ID]
+        selected = []
+        used = set()
+        for pid in priority:
+            for i, opt in enumerate(options):
+                if i in used:
+                    continue
+                if isinstance(opt, dict) and _opt_card_id(opt) == pid:
+                    selected.append(i)
+                    used.add(i)
+                    if len(selected) >= max_count:
+                        return selected
+        # Fill remaining slots
+        for i in range(len(options)):
+            if i not in used and len(selected) < max_count:
+                selected.append(i)
+        return selected if selected else [0]
+
+    # ── Card search (Ultra Ball / Master Ball / Love Ball result) ─────────────
+    if _ctx_matches(ctx, CTX_TO_HAND, _STR_CTX_TO_HAND):
+        bench = _bench_ids(me)
+        has_bellibolt   = BELLIBOLT_EX_ID in bench or _active_id(me) == BELLIBOLT_EX_ID
+        has_kilowattrel = KILOWATTREL_ID   in bench or _active_id(me) == KILOWATTREL_ID
+        search_priority = []
+        if not has_bellibolt:
+            search_priority.append(BELLIBOLT_EX_ID)
+        if not has_kilowattrel:
+            search_priority.append(KILOWATTREL_ID)
+        search_priority += [TADBULB_ID, WATTREL_ID]
+        for target_id in search_priority:
+            for i, opt in enumerate(options):
+                if isinstance(opt, dict) and _opt_card_id(opt) == target_id:
+                    return [i]
+        return [0]
+
+    # ── Discard cost (Ultra Ball: discard 2 cards) ────────────────────────────
+    if _ctx_matches(ctx, CTX_DISCARD, _STR_CTX_DISCARD):
+        # Prefer to discard: energy first, then trainers, keep Pokémon last
+        ENERGY_IDS  = {LIGHTNING_ENERGY_ID}
+        POKEMON_IDS = {TADBULB_ID, WATTREL_ID, BELLIBOLT_EX_ID, KILOWATTREL_ID}
+        tiers = [ENERGY_IDS, set(), POKEMON_IDS]  # energy > trainers > Pokémon
+        selected = []
+        used = set()
+        # Tier 1: energy
+        for i, opt in enumerate(options):
+            if len(selected) >= max_count:
+                break
+            cid = _opt_card_id(opt) if isinstance(opt, dict) else None
+            if cid in ENERGY_IDS and i not in used:
+                selected.append(i)
+                used.add(i)
+        # Tier 2: non-Pokémon, non-energy (trainers/supporters)
+        for i, opt in enumerate(options):
+            if len(selected) >= max_count:
+                break
+            cid = _opt_card_id(opt) if isinstance(opt, dict) else None
+            if cid not in ENERGY_IDS and cid not in POKEMON_IDS and i not in used:
+                selected.append(i)
+                used.add(i)
+        # Tier 3: Pokémon (last resort)
+        for i, opt in enumerate(options):
+            if len(selected) >= max_count:
+                break
+            if i not in used:
+                selected.append(i)
+                used.add(i)
+        return selected if selected else list(range(min(max_count, len(options))))
+
+    # ── Effect target (Boss's Orders / Catcher — pick lowest HP bench) ─────────
+    if _ctx_matches(ctx, CTX_EFFECT_TARGET, _STR_CTX_EFFECT_TARGET):
+        best_i, best_hp = 0, 9999
+        for i, opt in enumerate(options):
+            if isinstance(opt, dict):
+                hp = int(opt.get("hp", 9999))
+                if hp < best_hp:
+                    best_hp, best_i = hp, i
+        return [best_i]
+
+    # ── Switch/retreat target (choose bench Pokémon to send in) ───────────────
+    if (_ctx_matches(ctx, CTX_SWITCH_IN, _STR_CTX_SWITCH_IN) or
+            _ctx_matches(ctx, CTX_SWITCH_SELF, _STR_CTX_SWITCH_IN)):
+        return _pick_switch_target(options)
+
+    # ── Discard energy (Kilowattrel Flashing Draw cost) ───────────────────────
+    if _ctx_matches(ctx, CTX_DISCARD_ENERGY, _STR_CTX_DISCARD_ENERGY):
+        return [0]
+
+    # ── Unknown Card-select context: always safe to return [0] ───────────────
+    return [0]
+
+
 def rule_based_bellibolt(obs_dict: dict) -> list[int]:
     """
     §3.8.4 Guaranteed legal-action contract:
       - Never returns an index out of bounds.
       - Never returns an empty list when options exist.
       - Never crashes — all exceptions caught, fallback to [0].
+
+    FIX (v2): The original agent matched select.context against string literals
+    only. The real Kaggle cabt engine sends INTEGER context codes (e.g. context=8
+    for bench placement, context=1 for card-select). This caused INVALID at step 21
+    of episode 89328390. All context matching now handles both int and string.
     """
     global _state
 
@@ -548,139 +708,99 @@ def rule_based_bellibolt(obs_dict: dict) -> list[int]:
 
         curr = obs_dict.get("current") or {}
         turn = curr.get("turn", 0)
+        me, opp = _get_players(obs_dict)
 
-        # Reset per-turn supporter tracker
+        # Reset per-turn supporter tracker on new turn
         if turn != _state["last_turn"]:
             _state["last_turn"] = turn
             _state["supporter_played_this_turn"] = False
 
-        me, opp = _get_players(obs_dict)
+        # ── YES/NO prompt (mulligan accept, etc.) ────────────────────────────
+        if select_type == SELECT_YES_NO or _ctx_matches(select_ctx, 9, {"YESNO", "YES_NO", "ISFIRST"}):
+            result = [0]  # always Yes / first option
+            _debug_log(step, select_ctx, select_type, len(options), result)
+            return result
 
-        # ── §3.1 Setup: place active Pokémon ────────────────────────────────
-        if "SETUP_ACTIVE" in str(select_ctx).upper():
-            return _pick_setup_active(options)
+        # ── ALL type=1 Card-select prompts ───────────────────────────────────
+        # THE KEY FIX: previously fell through to [0] for integer contexts.
+        if select_type == SELECT_CARD:
+            result = _handle_card_select(select_data, me, opp)
+            _debug_log(step, select_ctx, select_type, len(options), result)
+            return result
 
-        # ── §3.2 Setup: place bench Pokémon ─────────────────────────────────
-        if "SETUP_BENCH" in str(select_ctx).upper():
-            picks = _pick_setup_bench(options)
-            return picks[:max_count]
-
-        # ── §3.1 Mulligan YES/NO ─────────────────────────────────────────────
-        if select_type == SELECT_YES_NO:
-            # Accept mulligan draws (YES = typically index 0 or 1 with type=1)
-            for i, opt in enumerate(options):
-                if isinstance(opt, dict) and opt.get("type") == 1:
-                    return [i]
-            return [0]
-
-        # ── Switch/Retreat target selection (non-MAIN prompts) ───────────────
-        if "SWITCH" in str(select_ctx).upper() or "TO_ACTIVE" in str(select_ctx).upper():
-            return _pick_switch_target(options)
-
-        # ── Discard energy for Flashing Draw (Kilowattrel ability cost) ──────
-        if "DISCARD_ENERGY" in str(select_ctx).upper():
-            # Pick any Lightning energy — just return first
-            return [0]
-
-        # ── Ultra Ball / Master Ball: search for a Pokémon ───────────────────
-        if "TO_HAND" in str(select_ctx).upper() or "CARD" in str(select_ctx).upper():
-            # Prioritize Bellibolt ex, then Kilowattrel, then Tadbulb, then Wattrel
-            priority_ids = [BELLIBOLT_EX_ID, KILOWATTREL_ID, TADBULB_ID, WATTREL_ID]
-            bench = _bench_ids(me)
-            has_bellibolt   = BELLIBOLT_EX_ID in bench
-            has_kilowattrel = KILOWATTREL_ID in bench
-
-            search_priority = []
-            if not has_bellibolt:
-                search_priority.append(BELLIBOLT_EX_ID)
-            if not has_kilowattrel:
-                search_priority.append(KILOWATTREL_ID)
-            search_priority.extend([TADBULB_ID, WATTREL_ID])
-
-            for target_id in search_priority:
-                for i, opt in enumerate(options):
-                    if isinstance(opt, dict) and _opt_card_id(opt) == target_id:
-                        return [i]
-            # Fallback: first option
-            return [0]
-
-        # ── Ultra Ball discard cost ──────────────────────────────────────────
-        if "DISCARD" in str(select_ctx).upper():
-            # Ultra Ball asks to discard 2 cards. Discard energy or low-value cards.
-            # Pick the first `max_count` options (engine only offers legal cards)
-            picks = list(range(min(max_count, len(options))))
-            return picks
-
-        # ── Boss's Orders target selection ───────────────────────────────────
-        if "EFFECT_TARGET" in str(select_ctx).upper():
-            # Pick the lowest-HP opponent bench target to set up a KO
-            best_i = 0
-            best_hp = 9999
-            for i, opt in enumerate(options):
-                if isinstance(opt, dict):
-                    hp = int(opt.get("hp", 9999))
-                    if hp < best_hp:
-                        best_hp = hp
-                        best_i = i
-            return [best_i]
-
-        # ── MAIN phase priority loop ─────────────────────────────────────────
+        # ── MAIN phase (type=0) ──────────────────────────────────────────────
         if select_type == SELECT_MAIN:
             already_supporter = _state["supporter_played_this_turn"]
-
-            # Check if we should retreat (Bellibolt on cooldown or Crustle matchup)
             want_retreat = _should_retreat_for_kilowattrel(options, me, opp)
 
-            # 1. Ability first (Electric Streamer) — attach all energy in hand
+            # 1. Ability first (Electric Streamer)
             ability_idx = _pick_ability(options, me)
             if ability_idx is not None:
-                return [ability_idx]
+                result = [ability_idx]
+                _debug_log(step, select_ctx, select_type, len(options), result)
+                return result
 
-            # 2. Evolve — always evolve when legal
+            # 2. Evolve
             evolve_idx = _pick_evolve(options, me)
             if evolve_idx is not None:
-                return [evolve_idx]
+                result = [evolve_idx]
+                _debug_log(step, select_ctx, select_type, len(options), result)
+                return result
 
             # 3. Attach manual energy
             attach_idx = _pick_attach(options, me)
             if attach_idx is not None:
-                return [attach_idx]
+                result = [attach_idx]
+                _debug_log(step, select_ctx, select_type, len(options), result)
+                return result
 
-            # 4. Play a card (supporter / item)
+            # 4. Play a card
             play_idx = _pick_play_card(options, me, opp, already_supporter)
             if play_idx is not None:
-                # Track if we played a supporter
                 play_opts = _find_options_of_type(options, OPT_PLAY)
                 for i, opt in play_opts:
                     if i == play_idx:
                         cid = _opt_card_id(opt)
                         if cid in (BOSS_ORDERS_ID, CHEREN_ID):
                             _state["supporter_played_this_turn"] = True
-                return [play_idx]
+                result = [play_idx]
+                _debug_log(step, select_ctx, select_type, len(options), result)
+                return result
 
             # 5. Retreat if needed
             if want_retreat:
                 retreat_idx = _pick_retreat(options, me)
                 if retreat_idx is not None:
-                    return [retreat_idx]
+                    result = [retreat_idx]
+                    _debug_log(step, select_ctx, select_type, len(options), result)
+                    return result
 
             # 6. Attack
             attack_idx = _pick_attack(options, me, opp)
             if attack_idx is not None:
-                return [attack_idx]
+                result = [attack_idx]
+                _debug_log(step, select_ctx, select_type, len(options), result)
+                return result
 
             # 7. End turn
             end_opts = _find_options_of_type(options, OPT_END)
             if end_opts:
-                return [end_opts[0][0]]
+                result = [end_opts[0][0]]
+                _debug_log(step, select_ctx, select_type, len(options), result)
+                return result
 
-        # ── §3.8.4 Legal fallback ─────────────────────────────────────────────
-        # At this point we have options but nothing matched. Return first legal option.
-        return [0]
+        # ── §3.8.4 Final fallback — first legal option ───────────────────────
+        result = [0]
+        _debug_log(step, select_ctx, select_type, len(options), result)
+        return result
 
-    except Exception:
-        # Absolute failsafe — never crash, always return a valid index
+    except Exception as e:
+        # Absolute failsafe
         try:
+            _debug_log(
+                (obs_dict or {}).get('step', '?'),
+                'EXCEPTION', str(e), 0, []
+            )
             select_data = obs_dict.get("select", {}) if obs_dict else {}
             opts = select_data.get("option", []) if select_data else []
             if opts:
