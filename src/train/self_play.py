@@ -8,6 +8,9 @@ from src.agent.policy import policy_agent
 from src.agent.rule_based import rule_based_agent
 from src.agent.state_encoder import ObservationEncoder
 
+# Global encoder to prevent MemoryError when sampling opponents repeatedly
+_global_encoder = None
+
 class SelfPlayPool:
     def __init__(self, pool_dir="models/pool", latest_model_path="models/ppo_phase3.pth"):
         self.pool_dir = pool_dir
@@ -60,8 +63,11 @@ class SelfPlayPool:
         # We need to import ActorCritic locally to avoid circular imports 
         # or multiprocessing pickling issues if passed from main
         from src.train.train_ppo import ActorCritic
+        global _global_encoder
+        if _global_encoder is None:
+            _global_encoder = ObservationEncoder()
         
-        encoder = ObservationEncoder()
+        encoder = _global_encoder
         state_dim = encoder.get_state_dim()
         # Action space max is 100 for now, should match MAX_ACTION_SPACE in train_ppo
         from src.agent.action_mask import MAX_ACTION_SPACE
@@ -79,22 +85,12 @@ class SelfPlayPool:
             state = encoder.encode(obs)
             state_t = torch.FloatTensor(state).unsqueeze(0)
             
-            from src.agent.action_mask import get_action_mask
-            mask = get_action_mask(obs)
-            mask_t = torch.FloatTensor(mask).unsqueeze(0)
-            
             with torch.no_grad():
                 logits, _ = model(state_t)
-                masked = logits.clone()
-                masked[mask_t == 0] = -1e9
-                probs = torch.softmax(masked, dim=-1)
+                logits = logits.squeeze(0).numpy()
                 
-                # If everything is masked out (should not happen if engine works)
-                if probs.sum() == 0 or torch.isnan(probs).any():
-                    return rule_based_agent(obs)
-                    
-                action = torch.multinomial(probs[0], 1).item()
-                return action
+            from src.agent.action_mask import sample_valid_action
+            return sample_valid_action(logits, obs)
                 
         return agent
 

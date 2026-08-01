@@ -31,7 +31,7 @@ STATE_DIM       = ObservationEncoder.STATE_DIM   # 167
 ACTION_DIM      = MAX_ACTION_SPACE               # 150
 HIDDEN_DIM      = 256
 N_WORKERS       = 8          # parallel envs (tune to your CPU core count)
-EPISODES        = 100_000    # overnight training total episodes
+EPISODES        = 75_000     # overnight training total episodes (~7 hrs)
 MAX_STEPS       = 300        # max steps per episode
 GAMMA           = 0.99
 CLIP_RATIO      = 0.2
@@ -126,7 +126,13 @@ def train():
     os.makedirs("models", exist_ok=True)
 
     encoder = ObservationEncoder()
-    model   = ActorCritic().to(device)
+    model   = ActorCritic(state_dim=STATE_DIM, action_dim=ACTION_DIM, hidden=HIDDEN_DIM).to(device)
+    
+    # Resume from previous run if it exists
+    if os.path.exists("models/ppo_phase3.pth"):
+        model.load_state_dict(torch.load("models/ppo_phase3.pth", map_location=device, weights_only=True))
+        print("Resuming from existing models/ppo_phase3.pth checkpoint!")
+        
     optimizer = optim.Adam(model.parameters(), lr=LR)
 
     # Spawn worker processes
@@ -143,6 +149,12 @@ def train():
         parent_conns.append(parent_conn)
         child_conns.append(child_conn)
 
+    # PPO Hyperparams
+    STEPS_PER_ROLLOUT = 128
+    PPO_EPOCHS = 4
+    MINIBATCH_SIZE = 256
+    GAE_LAMBDA = 0.95
+    
     # Collect initial observations
     obs_list = []
     for conn in parent_conns:
@@ -155,144 +167,231 @@ def train():
 
     try:
         while ep < EPISODES:
-            # ── Rollout: one step across all N_WORKERS ──
-            states = np.stack([encoder.encode(o) for o in obs_list])   # (N, STATE_DIM)
-            state_t = torch.tensor(states, dtype=torch.float32).to(device)
-
-            with torch.no_grad():
-                logits, values = model(state_t)
-
-            actions, log_probs = [], []
-            for i, obs in enumerate(obs_list):
-                mask = get_action_mask(obs)
-                mask_t = torch.from_numpy(mask).to(device)
-                masked = logits[i].clone()
-                masked[~mask_t] = -1e9
-                probs = torch.softmax(masked, dim=-1)
-
-                if probs.sum() < 1e-8 or torch.isnan(probs).any():
-                    action = [0]
-                    log_prob = torch.tensor(0.0, device=device)
-                else:
-                    select_data = obs.get("select", {})
-                    max_count = select_data.get("maxCount", 1)
-                    num_valid = mask_t.sum().item()
-                    max_count = min(max_count, num_valid)
+            # ── Rollout Collection ──
+            batch_states, batch_actions, batch_log_probs = [], [], []
+            batch_rewards, batch_dones, batch_values, batch_masks = [], [], [], []
+            
+            for step in range(STEPS_PER_ROLLOUT):
+                states = np.stack([encoder.encode(o) for o in obs_list])   # (N, STATE_DIM)
+                state_t = torch.tensor(states, dtype=torch.float32).to(device)
+                
+                with torch.no_grad():
+                    logits, values = model(state_t)
                     
-                    if max_count <= 1:
-                        dist = torch.distributions.Categorical(probs)
-                        idx  = dist.sample()
-                        action = [idx.item()]
-                        log_prob = dist.log_prob(idx)
+                actions, log_probs = [], []
+                masks = []
+                for i, obs in enumerate(obs_list):
+                    mask = get_action_mask(obs)
+                    masks.append(mask)
+                    mask_t = torch.from_numpy(mask).to(device)
+                    masked = logits[i].clone()
+                    masked[~mask_t] = -1e9
+                    probs = torch.softmax(masked, dim=-1)
+
+                    if probs.sum() < 1e-8 or torch.isnan(probs).any():
+                        action = [0]
+                        log_prob = torch.tensor(0.0, device=device)
                     else:
-                        # Sample without replacement for max_count > 1
-                        action = []
-                        log_prob_sum = torch.tensor(0.0, device=device)
-                        curr_probs = probs.clone()
-                        for _ in range(max_count):
-                            dist = torch.distributions.Categorical(curr_probs)
-                            idx = dist.sample()
-                            action.append(idx.item())
-                            log_prob_sum += dist.log_prob(idx)
-                            # Mask out the chosen action
-                            curr_probs[idx] = 0.0
-                            if curr_probs.sum() > 0:
-                                curr_probs = curr_probs / curr_probs.sum()
-                            else:
-                                break
-                        log_prob = log_prob_sum
+                        select_data = obs.get("select", {})
+                        max_count = select_data.get("maxCount", 1)
+                        num_valid = mask_t.sum().item()
+                        max_count = min(max_count, num_valid)
+                        
+                        if max_count <= 1:
+                            dist = torch.distributions.Categorical(probs)
+                            idx  = dist.sample()
+                            action = [idx.item()]
+                            log_prob = dist.log_prob(idx)
+                        else:
+                            # Sample without replacement
+                            action = []
+                            log_prob_sum = torch.tensor(0.0, device=device)
+                            curr_probs = probs.clone()
+                            for _ in range(max_count):
+                                dist = torch.distributions.Categorical(curr_probs)
+                                idx = dist.sample()
+                                action.append(idx.item())
+                                log_prob_sum += dist.log_prob(idx)
+                                curr_probs[idx] = 0.0
+                                if curr_probs.sum() > 0:
+                                    curr_probs = curr_probs / curr_probs.sum()
+                                else:
+                                    break
+                            log_prob = log_prob_sum
 
-                actions.append(action)
-                log_probs.append(log_prob)
+                    actions.append(action)
+                    log_probs.append(log_prob)
 
-            # Send actions to workers
-            for conn, action in zip(parent_conns, actions):
-                conn.send(action)
+                # Send actions
+                for conn, action in zip(parent_conns, actions):
+                    conn.send(action)
 
-            # Collect results
-            new_obs_list, rewards, dones = [], [], []
-            for conn in parent_conns:
-                tag, obs, reward, done = conn.recv()
-                new_obs_list.append(obs)
-                rewards.append(reward)
-                dones.append(done)
+                # Collect results
+                new_obs_list, rewards, dones = [], [], []
+                for conn in parent_conns:
+                    tag, obs, reward, done = conn.recv()
+                    new_obs_list.append(obs)
+                    rewards.append(reward)
+                    dones.append(done)
+                
+                # Append to buffers
+                batch_states.append(state_t)
+                batch_actions.append(actions)
+                batch_log_probs.append(torch.stack(log_probs))
+                batch_rewards.append(torch.tensor(rewards, dtype=torch.float32).to(device))
+                batch_dones.append(torch.tensor(dones, dtype=torch.float32).to(device))
+                batch_values.append(values.squeeze(-1))
+                batch_masks.append(torch.tensor(np.stack(masks), dtype=torch.bool).to(device))
+                
+                obs_list = new_obs_list
+                
+                # Bookkeeping
+                for i, done in enumerate(dones):
+                    if done:
+                        ep += 1
+                        result = obs_list[i].get('current', {})
+                        if result:
+                            r = result.get('result', -1)
+                            if r == 0: total_wins += 1
+                        
+                        # Tell worker to reset
+                        parent_conns[i].send('reset')
+                        tag, new_obs = parent_conns[i].recv()
+                        obs_list[i] = new_obs
 
-            # ── PPO update ──
-            rewards_t   = torch.tensor(rewards,   dtype=torch.float32).to(device)
-            dones_t     = torch.tensor(dones,     dtype=torch.float32).to(device)
-            log_probs_t = torch.stack(log_probs)
+                        if ep % 50 == 0:
+                            win_rate = total_wins / ep
+                            dt = time.time() - t0
+                            print(f"Ep: {ep} | WR: {win_rate:.2f} | Time: {dt:.1f}s", flush=True)
+                        
+                        if ep % CHECKPOINT_EVERY == 0:
+                            ckpt_path = os.path.join(POOL_DIR, f"checkpoint_{ep}.pth")
+                            torch.save(model.state_dict(), ckpt_path)
+                            print(f"Saved checkpoint to {ckpt_path}", flush=True)
 
-            # Next values for TD target
-            next_states = np.stack([encoder.encode(o) for o in new_obs_list])
-            next_t = torch.tensor(next_states, dtype=torch.float32).to(device)
+            # ── GAE Advantage Computation ──
+            # Get next value for the very last step
+            states = np.stack([encoder.encode(o) for o in obs_list])
+            next_t = torch.tensor(states, dtype=torch.float32).to(device)
             with torch.no_grad():
                 _, next_values = model(next_t)
                 next_values = next_values.squeeze(-1)
+            
+            advantages = torch.zeros_like(batch_rewards[0]).to(device)
+            returns = []
+            
+            for t in reversed(range(STEPS_PER_ROLLOUT)):
+                if t == STEPS_PER_ROLLOUT - 1:
+                    next_non_terminal = 1.0 - batch_dones[t]
+                    next_val = next_values
+                else:
+                    next_non_terminal = 1.0 - batch_dones[t]
+                    next_val = batch_values[t + 1]
+                
+                delta = batch_rewards[t] + GAMMA * next_val * next_non_terminal - batch_values[t]
+                advantages = delta + GAMMA * GAE_LAMBDA * next_non_terminal * advantages
+                returns.insert(0, advantages + batch_values[t])
+                
+            # Flatten rollout tensors
+            # shapes: (STEPS, WORKERS, ...) -> (STEPS * WORKERS, ...)
+            b_states = torch.cat(batch_states)
+            b_log_probs = torch.cat(batch_log_probs)
+            b_returns = torch.cat(returns)
+            b_advantages = b_returns - torch.cat(batch_values)
+            b_masks = torch.cat(batch_masks)
+            
+            # Normalize advantages
+            b_advantages = (b_advantages - b_advantages.mean()) / (b_advantages.std() + 1e-8)
+            
+            # Action lists need to be flattened carefully since they are lists of lists of ints
+            flat_actions = []
+            for t_actions in batch_actions:
+                for w_action in t_actions:
+                    flat_actions.append(w_action)
+            
+            # ── PPO Mini-batch Updates ──
+            dataset_size = len(b_states)
+            indices = np.arange(dataset_size)
+            
+            for _ in range(PPO_EPOCHS):
+                np.random.shuffle(indices)
+                for start in range(0, dataset_size, MINIBATCH_SIZE):
+                    end = start + MINIBATCH_SIZE
+                    mb_idx = indices[start:end]
+                    
+                    mb_states = b_states[mb_idx]
+                    mb_masks = b_masks[mb_idx]
+                    mb_log_probs_old = b_log_probs[mb_idx]
+                    mb_returns = b_returns[mb_idx]
+                    mb_advantages = b_advantages[mb_idx]
+                    
+                    logits, values = model(mb_states)
+                    values = values.squeeze(-1)
+                    
+                    # Recompute log probs for actions
+                    mb_log_probs = []
+                    for k, idx in enumerate(mb_idx):
+                        mask_t = mb_masks[k]
+                        action_list = flat_actions[idx]
+                        
+                        if len(action_list) == 1:
+                            masked = torch.where(mask_t, logits[k], torch.tensor(-1e9, device=device))
+                            dist = torch.distributions.Categorical(logits=masked)
+                            idx_t = torch.tensor(action_list[0], device=device)
+                            mb_log_probs.append(dist.log_prob(idx_t))
+                        else:
+                            log_prob_sum = torch.tensor(0.0, device=device)
+                            curr_mask = mask_t.clone()
+                            for a in action_list:
+                                masked = torch.where(curr_mask, logits[k], torch.tensor(-1e9, device=device))
+                                dist = torch.distributions.Categorical(logits=masked)
+                                idx_t = torch.tensor(a, device=device)
+                                log_prob_sum = log_prob_sum + dist.log_prob(idx_t)
+                                curr_mask = curr_mask.clone()
+                                curr_mask[a] = False
+                            mb_log_probs.append(log_prob_sum)
+                            
+                    mb_log_probs = torch.stack(mb_log_probs)
+                    
+                    # Policy Loss (Clipped Surrogate Objective)
+                    ratio = torch.exp(mb_log_probs - mb_log_probs_old)
+                    surr1 = ratio * mb_advantages
+                    surr2 = torch.clamp(ratio, 1.0 - CLIP_RATIO, 1.0 + CLIP_RATIO) * mb_advantages
+                    actor_loss = -torch.min(surr1, surr2).mean()
+                    
+                    # Value Loss
+                    critic_loss = 0.5 * (mb_returns - values).pow(2).mean()
+                    
+                    # Entropy Bonus
+                    masked_logits = torch.where(mb_masks, logits, torch.tensor(-1e9, device=device))
+                    probs = torch.softmax(masked_logits, dim=-1)
+                    entropy = -(probs * (probs + 1e-8).log()).sum(-1).mean()
+                    
+                    loss = actor_loss + critic_loss - ENTROPY_COEF * entropy
+                    
+                    optimizer.zero_grad()
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
+                    optimizer.step()
 
-            td_targets = rewards_t + GAMMA * next_values * (1.0 - dones_t)
-            advantages = (td_targets - values.squeeze(-1)).detach()
-
-            actor_loss  = -(log_probs_t * advantages).mean()
-            critic_loss = advantages.pow(2).mean()
-            # Re-compute entropy for bonus
-            state_t2 = torch.tensor(states, dtype=torch.float32).to(device)
-            logits2, _ = model(state_t2)
-            probs2 = torch.softmax(logits2, dim=-1)
-            entropy = -(probs2 * (probs2 + 1e-8).log()).sum(-1).mean()
-            loss = actor_loss + 0.5 * critic_loss - ENTROPY_COEF * entropy
-
-            optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
-            optimizer.step()
-
-            # ── Episode bookkeeping ──
-            for i, done in enumerate(dones):
-                if done:
-                    ep += 1
-                    result = new_obs_list[i].get('current', {})
-                    if result:
-                        r = result.get('result', -1)
-                        if r == 0:
-                            total_wins += 1
-
-                    if ep % 500 == 0:
-                        win_rate = total_wins / ep
-                        elapsed = time.time() - t0
-                        print(f"  Ep {ep:>6}/{EPISODES}  WinRate={win_rate:.1%}  Loss={loss.item():.4f}  [{elapsed:.0f}s]")
-
-                    if ep % CHECKPOINT_EVERY == 0:
-                        ckpt = os.path.join(POOL_DIR, f"checkpoint_{ep}.pth")
-                        torch.save(model.state_dict(), ckpt)
-                        print(f"  Checkpoint saved to {ckpt}")
-
-                    # Reset this worker
-                    parent_conns[i].send('reset')
-                    tag, obs = parent_conns[i].recv()
-                    new_obs_list[i] = obs
-
-            obs_list = new_obs_list
-
+    except KeyboardInterrupt:
+        print("Training interrupted manually.")
     finally:
-        # Shutdown workers
         for conn in parent_conns:
-            try: conn.send('close')
-            except: pass
+            conn.send('close')
         for p in workers:
-            p.join(timeout=2)
+            p.join(timeout=1.0)
+            if p.is_alive():
+                p.terminate()
 
-    # Save final model
-    torch.save(model.state_dict(), "models/ppo_phase3.pth")
-    print("Saved to models/ppo_phase3.pth")
-
-    # Export NumPy weights for Kaggle
-    export_weights(model, "models/ppo_weights.npz")
-
-    win_rate = total_wins / max(ep, 1)
-    print(f"\nTraining complete. Final win rate vs rule-based: {win_rate:.1%} over {ep} episodes.")
-    return model
-
+        torch.save(model.state_dict(), "models/ppo_phase3.pth")
+        print("Saved models/ppo_phase3.pth")
+        
+        try:
+            export_weights(model, "models/ppo_weights.npz")
+        except:
+            pass
 
 if __name__ == "__main__":
-    mp.set_start_method("spawn", force=True)
+    mp.set_start_method("spawn")
     train()
