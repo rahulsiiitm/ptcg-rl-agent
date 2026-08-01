@@ -25,13 +25,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from src.agent.state_encoder import ObservationEncoder
 from src.agent.action_mask import get_action_mask, MAX_ACTION_SPACE
+from src.agent.rule_based_bellibolt import rule_based_bellibolt
 
 # ─── Hyperparameters ──────────────────────────────────────────────────────────
 STATE_DIM       = ObservationEncoder.STATE_DIM   # 167
 ACTION_DIM      = MAX_ACTION_SPACE               # 150
 HIDDEN_DIM      = 256
 N_WORKERS       = 8          # parallel envs (tune to your CPU core count)
-EPISODES        = 75_000     # overnight training total episodes (~7 hrs)
+EPISODES        = 100_000    # full training run
 MAX_STEPS       = 300        # max steps per episode
 GAMMA           = 0.99
 CLIP_RATIO      = 0.2
@@ -39,6 +40,9 @@ LR              = 3e-4
 ENTROPY_COEF    = 0.01       # encourage exploration
 CHECKPOINT_EVERY = 5_000     # save to pool every N episodes
 POOL_DIR        = "models/pool"
+
+IMITATION_LAMBDA = 0.8
+IMITATION_EPISODES = 20_000
 
 # Load deck directly from deck.csv to ensure inference exactly matches training
 def _load_deck_from_csv(path="deck.csv"):
@@ -125,7 +129,7 @@ def train():
     os.makedirs(POOL_DIR, exist_ok=True)
     os.makedirs("models", exist_ok=True)
 
-    encoder = ObservationEncoder()
+    encoders = [ObservationEncoder() for _ in range(N_WORKERS)]
     model   = ActorCritic(state_dim=STATE_DIM, action_dim=ACTION_DIM, hidden=HIDDEN_DIM).to(device)
     
     # Resume from previous run if it exists
@@ -170,9 +174,10 @@ def train():
             # ── Rollout Collection ──
             batch_states, batch_actions, batch_log_probs = [], [], []
             batch_rewards, batch_dones, batch_values, batch_masks = [], [], [], []
+            batch_expert_actions = []
             
             for step in range(STEPS_PER_ROLLOUT):
-                states = np.stack([encoder.encode(o) for o in obs_list])   # (N, STATE_DIM)
+                states = np.stack([encoders[i].encode(o) for i, o in enumerate(obs_list)])   # (N, STATE_DIM)
                 state_t = torch.tensor(states, dtype=torch.float32).to(device)
                 
                 with torch.no_grad():
@@ -180,7 +185,11 @@ def train():
                     
                 actions, log_probs = [], []
                 masks = []
+                expert_actions = []
                 for i, obs in enumerate(obs_list):
+                    expert_a = rule_based_bellibolt(obs)
+                    expert_actions.append(expert_a[0] if expert_a else 0)
+                    
                     mask = get_action_mask(obs)
                     masks.append(mask)
                     mask_t = torch.from_numpy(mask).to(device)
@@ -228,11 +237,13 @@ def train():
 
                 # Collect results
                 new_obs_list, rewards, dones = [], [], []
-                for conn in parent_conns:
+                for i, conn in enumerate(parent_conns):
                     tag, obs, reward, done = conn.recv()
                     new_obs_list.append(obs)
                     rewards.append(reward)
                     dones.append(done)
+                    if done:
+                        encoders[i].reset()
                 
                 # Append to buffers
                 batch_states.append(state_t)
@@ -242,6 +253,7 @@ def train():
                 batch_dones.append(torch.tensor(dones, dtype=torch.float32).to(device))
                 batch_values.append(values.squeeze(-1))
                 batch_masks.append(torch.tensor(np.stack(masks), dtype=torch.bool).to(device))
+                batch_expert_actions.append(torch.tensor(expert_actions, dtype=torch.long).to(device))
                 
                 obs_list = new_obs_list
                 
@@ -271,7 +283,7 @@ def train():
 
             # ── GAE Advantage Computation ──
             # Get next value for the very last step
-            states = np.stack([encoder.encode(o) for o in obs_list])
+            states = np.stack([encoders[i].encode(o) for i, o in enumerate(obs_list)])
             next_t = torch.tensor(states, dtype=torch.float32).to(device)
             with torch.no_grad():
                 _, next_values = model(next_t)
@@ -299,6 +311,7 @@ def train():
             b_returns = torch.cat(returns)
             b_advantages = b_returns - torch.cat(batch_values)
             b_masks = torch.cat(batch_masks)
+            b_expert_actions = torch.cat(batch_expert_actions)
             
             # Normalize advantages
             b_advantages = (b_advantages - b_advantages.mean()) / (b_advantages.std() + 1e-8)
@@ -313,6 +326,8 @@ def train():
             dataset_size = len(b_states)
             indices = np.arange(dataset_size)
             
+            c2_imitation = max(0.0, IMITATION_LAMBDA * (1.0 - ep / IMITATION_EPISODES))
+            
             for _ in range(PPO_EPOCHS):
                 np.random.shuffle(indices)
                 for start in range(0, dataset_size, MINIBATCH_SIZE):
@@ -324,6 +339,7 @@ def train():
                     mb_log_probs_old = b_log_probs[mb_idx]
                     mb_returns = b_returns[mb_idx]
                     mb_advantages = b_advantages[mb_idx]
+                    mb_expert_actions = b_expert_actions[mb_idx]
                     
                     logits, values = model(mb_states)
                     values = values.squeeze(-1)
@@ -367,7 +383,10 @@ def train():
                     probs = torch.softmax(masked_logits, dim=-1)
                     entropy = -(probs * (probs + 1e-8).log()).sum(-1).mean()
                     
-                    loss = actor_loss + critic_loss - ENTROPY_COEF * entropy
+                    # Imitation Loss
+                    imitation_loss = nn.CrossEntropyLoss()(logits, mb_expert_actions)
+                    
+                    loss = actor_loss + critic_loss - ENTROPY_COEF * entropy + c2_imitation * imitation_loss
                     
                     optimizer.zero_grad()
                     loss.backward()

@@ -201,8 +201,16 @@ def _energy_count(player: dict) -> int:
                 if isinstance(e, dict) and e.get("id") == LIGHTNING_ENERGY_ID])
 
 
-def _is_crustle(opp: dict) -> bool:
-    """§3.3 step 1 — detect Crustle as the opponent's active Pokémon."""
+def _is_crustle(opp: dict, obs_dict: dict = None) -> bool:
+    """§3.3 step 1 — detect Crustle as the opponent's active Pokémon.
+       Also handles Neutralization Zone (1247) which blocks all our Bellibolt ex attacks.
+    """
+    if obs_dict:
+        stadium = obs_dict.get("current", {}).get("stadium", [])
+        if stadium and isinstance(stadium, list) and len(stadium) > 0:
+            if stadium[0].get("id") == 1247:
+                return True
+                
     active_id = _active_id(opp)
     if active_id in CRUSTLE_IDS:
         return True
@@ -291,13 +299,10 @@ def _pick_setup_bench(options: list) -> list[int]:
     return selected
 
 
-def _pick_attack(options: list, me: dict, opp: dict) -> int | None:
+def _pick_attack(options: list, me: dict, opp: dict, obs_dict: dict) -> int | None:
     """
-    §3.3 / §3.8 — Choose the best attack.
-    Returns option index or None if no attack should be chosen yet.
-
-    Priority:
-      1. If opponent active is Crustle → use Mach Bolt (on Kilowattrel bench swap first)
+    §3.8 — Attack phase selection
+      1. If opponent active is Crustle (or Neutralization Zone) → use Mach Bolt (on Kilowattrel bench swap first)
       2. If Bellibolt ex is active:
          a. Use Thunderous Bolt if available (not on cooldown)
          b. If Thunderous Bolt NOT available (cooldown) → signal to retreat instead
@@ -307,7 +312,7 @@ def _pick_attack(options: list, me: dict, opp: dict) -> int | None:
     if not attack_opts:
         return None
 
-    crustle_matchup = _is_crustle(opp)
+    crustle_matchup = _is_crustle(opp, obs_dict)
     my_active_id = _active_id(me)
 
     if my_active_is_bellibolt := (my_active_id == BELLIBOLT_EX_ID):
@@ -315,22 +320,17 @@ def _pick_attack(options: list, me: dict, opp: dict) -> int | None:
             # Bellibolt can't damage Crustle ex-immunity — do NOT attack, retreat instead
             return None
 
-        # Find Thunderous Bolt
-        for i, opt in attack_opts:
-            if "thunderous bolt" in _opt_name(opt) or "thunderous" in _opt_name(opt):
-                return i  # use Thunderous Bolt
+        # Bellibolt only has one attack. If the engine offers an attack, it is Thunderous Bolt.
+        # (It hides the attack entirely if it is on cooldown).
+        if attack_opts:
+            return attack_opts[0][0]
 
-        # Thunderous Bolt not offered → engine-enforced cooldown — skip attack, retreat
+        # Attack not offered -> cooldown -> retreat
         return None
 
     elif my_active_id == KILOWATTREL_ID:
         # Kilowattrel attacks regardless of Crustle — Mach Bolt bypasses ex-immunity
-        for i, opt in attack_opts:
-            if "mach bolt" in _opt_name(opt) or "mach" in _opt_name(opt):
-                return i
-        # No Mach Bolt name found — fallback to first available attack
-        if attack_opts:
-            return attack_opts[0][0]
+        return attack_opts[0][0]
 
     else:
         # Any other active Pokémon — use first available attack
@@ -340,7 +340,7 @@ def _pick_attack(options: list, me: dict, opp: dict) -> int | None:
     return None
 
 
-def _should_retreat_for_kilowattrel(options: list, me: dict, opp: dict) -> bool:
+def _should_retreat_for_kilowattrel(options: list, me: dict, opp: dict, obs_dict: dict) -> bool:
     """
     §3.7 — Retreat Bellibolt ex when:
       - It's on cooldown (no Thunderous Bolt offered by engine), AND
@@ -352,16 +352,15 @@ def _should_retreat_for_kilowattrel(options: list, me: dict, opp: dict) -> bool:
     if not _has_kilowattrel_on_bench(me):
         return False
 
-    crustle_matchup = _is_crustle(opp)
+    crustle_matchup = _is_crustle(opp, obs_dict)
     if crustle_matchup:
         return True
 
     # Check if Thunderous Bolt is unavailable (cooldown)
+    # Since the engine doesn't provide attack names, we check if NO attacks are offered.
     attack_opts = _find_options_of_type(options, OPT_ATTACK)
-    has_thunderous_bolt = any(
-        "thunderous" in _opt_name(opt) for _, opt in attack_opts
-    )
-    return not has_thunderous_bolt
+    has_attack = len(attack_opts) > 0
+    return not has_attack
 
 
 def _pick_ability(options: list, me: dict) -> int | None:
@@ -380,7 +379,7 @@ def _pick_ability(options: list, me: dict) -> int | None:
     return None
 
 
-def _pick_play_card(options: list, me: dict, opp: dict, already_played_supporter: bool) -> int | None:
+def _pick_play_card(options: list, me: dict, opp: dict, already_played_supporter: bool, obs_dict: dict) -> int | None:
     """
     §3.5 / §3.6 — Priority order for playing cards from hand:
     Boss's Orders > Ultra Ball > Buddy-Buddy Poffin > Master Ball > Cheren > Catcher > Switch > Air Balloon
@@ -464,7 +463,7 @@ def _pick_play_card(options: list, me: dict, opp: dict, already_played_supporter
 
     # Switch — handled in retreat section, but allow if explicitly in PLAY options
     if SWITCH_ID in card_map:
-        if _should_retreat_for_kilowattrel(options, me, opp):
+        if _should_retreat_for_kilowattrel(options, me, opp, obs_dict):
             return card_map[SWITCH_ID]
 
     return None
@@ -731,7 +730,7 @@ def rule_based_bellibolt(obs_dict: dict) -> list[int]:
         # ── MAIN phase (type=0) ──────────────────────────────────────────────
         if select_type == SELECT_MAIN:
             already_supporter = _state["supporter_played_this_turn"]
-            want_retreat = _should_retreat_for_kilowattrel(options, me, opp)
+            want_retreat = _should_retreat_for_kilowattrel(options, me, opp, obs_dict)
 
             # 1. Ability first (Electric Streamer)
             ability_idx = _pick_ability(options, me)
@@ -754,8 +753,8 @@ def rule_based_bellibolt(obs_dict: dict) -> list[int]:
                 _debug_log(step, select_ctx, select_type, len(options), result)
                 return result
 
-            # 4. Play a card
-            play_idx = _pick_play_card(options, me, opp, already_supporter)
+            # 4. Play cards (Boss, Poffin, Cheren, Switch, Catcher)
+            play_idx = _pick_play_card(options, me, opp, already_supporter, obs_dict)
             if play_idx is not None:
                 play_opts = _find_options_of_type(options, OPT_PLAY)
                 for i, opt in play_opts:

@@ -27,19 +27,28 @@ def parse_damage(dmg_str: str) -> float:
 
 class ObservationEncoder:
     """
-    Phase 3 encoder.
-    Global: 5
-    Per Player:
-      Active: 52 (slot) + 5 (status) = 57
-      Bench: 52 * 5 = 260
-      Board: 3
-      Total = 320
-    Total State: 5 + 320 + 320 = 645
+    Phase 3 encoder with Frame Stacking (History=4).
+    Single State:
+      Global: 5
+      Per Player:
+        Active: 52 (slot) + 5 (status) = 57
+        Bench: 52 * 5 = 260
+        Board: 3
+        Total = 320
+      Total State: 5 + 320 + 320 = 645
+    Stacked State (4 frames): 645 * 4 = 2580
     """
-    STATE_DIM = 645
+    SINGLE_STATE_DIM = 645
+    HISTORY_LEN = 4
+    STATE_DIM = SINGLE_STATE_DIM * HISTORY_LEN
 
     def __init__(self):
         self.db = CardLookup() if CardLookup is not None else None
+        self.reset()
+
+    def reset(self):
+        self.history = []
+        self.last_step = -1
 
     def _get_type_onehot(self, t_str: str) -> np.ndarray:
         vec = np.zeros(NUM_TYPES, dtype=np.float32)
@@ -156,9 +165,29 @@ class ObservationEncoder:
         me_encoded = encode_player(p_me)    # 57 + 260 + 3 = 320
         opp_encoded = encode_player(p_opp)  # 320
         
-        state = np.concatenate([global_feats, me_encoded, opp_encoded])
-        assert len(state) == self.STATE_DIM, f"State dim mismatch: {len(state)} vs {self.STATE_DIM}"
-        return state.astype(np.float32)
+        current_state = np.concatenate([global_feats, me_encoded, opp_encoded])
+        
+        # Frame stacking logic
+        step = obs_dict.get('step', -1)
+        if step < self.last_step and step != -1:
+            self.reset()
+            
+        if step != self.last_step or not self.history:
+            self.history.append(current_state)
+            if len(self.history) > self.HISTORY_LEN:
+                self.history.pop(0)
+            self.last_step = step
+        else:
+            # Same step (e.g. multiple prompts in one turn) -> overwrite last
+            self.history[-1] = current_state
+
+        stacked = np.zeros(self.STATE_DIM, dtype=np.float32)
+        for i, h in enumerate(self.history):
+            # Place newest at the end
+            start = (self.HISTORY_LEN - len(self.history) + i) * self.SINGLE_STATE_DIM
+            stacked[start:start+self.SINGLE_STATE_DIM] = h
+
+        return stacked.astype(np.float32)
 
     def get_state_dim(self) -> int:
         return self.STATE_DIM

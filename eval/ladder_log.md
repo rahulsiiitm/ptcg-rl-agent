@@ -12,3 +12,4 @@
 | 2026-08-01 | Phase 4 v1 Bellibolt | Iono's Bellibolt / Kilowattrel | **ERROR** | N/A | Missing `__init__.py` — `ImportError` on startup. |
 | 2026-08-01 | Phase 4 v2 Bellibolt | Iono's Bellibolt / Kilowattrel | **ERROR** | N/A | 2x Master Ball illegal — ACE SPEC max 1 per deck. |
 | 2026-08-01 | Phase 4 v3 Bellibolt | Iono's Bellibolt / Kilowattrel | **PENDING** | N/A | Fix: 1x Master Ball + 1x Love Ball. Crustle detection, cooldown, Kilowattrel pivot. |
+| 2026-08-01 | Phase 4 v4 Bellibolt (ctx fix) | Iono's Bellibolt / Kilowattrel | **PENDING** | N/A | **Key fix**: `select.context` is an INTEGER in real engine (e.g. 8=bench). Old string matching caused INVALID at step 21. Added `_handle_card_select()` + debug log. |

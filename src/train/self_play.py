@@ -93,4 +93,3 @@ class SelfPlayPool:
             return sample_valid_action(logits, obs)
                 
         return agent
-
