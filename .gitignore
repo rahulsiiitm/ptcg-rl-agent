@@ -15,3 +15,5 @@ Thumbs.db
 # Models
 models/pool/
 *.pth
+
+scratch
