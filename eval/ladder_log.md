@@ -11,5 +11,11 @@
 | 2026-08-01 | Phase 3 True PPO (78k eps) | Snorlax (4 Pokémon) | **154.6** | N/A | Bench-out regression. Deck upgrade mandatory. |
 | 2026-08-01 | Phase 4 v1 Bellibolt | Iono's Bellibolt / Kilowattrel | **ERROR** | N/A | Missing `__init__.py` — `ImportError` on startup. |
 | 2026-08-01 | Phase 4 v2 Bellibolt | Iono's Bellibolt / Kilowattrel | **ERROR** | N/A | 2x Master Ball illegal — ACE SPEC max 1 per deck. |
-| 2026-08-01 | Phase 4 v3 Bellibolt | Iono's Bellibolt / Kilowattrel | **PENDING** | N/A | Fix: 1x Master Ball + 1x Love Ball. Crustle detection, cooldown, Kilowattrel pivot. |
-| 2026-08-01 | Phase 4 v4 Bellibolt (ctx fix) | Iono's Bellibolt / Kilowattrel | **PENDING** | N/A | **Key fix**: `select.context` is an INTEGER in real engine (e.g. 8=bench). Old string matching caused INVALID at step 21. Added `_handle_card_select()` + debug log. |
+| 2026-08-01 | Phase 4 v3 Bellibolt | Iono's Bellibolt / Kilowattrel | **157.6** | N/A | Fix: 1x Master Ball + 1x Love Ball. Survived! |
+| 2026-08-01 | Phase 4 v4 Bellibolt (ctx fix) | Iono's Bellibolt / Kilowattrel | **ERROR** | N/A | Still errored out. |
+| 2026-08-01 | Hybrid RL Agent (500 ep test) | Lopunny/Froslass | **224.9** | N/A | After main.py fixes, successfully scored 224.9! |
+| 2026-08-02 | Phase 6 PPO Lookahead | Lopunny/Froslass | **ERROR** | N/A | Crashed on Kaggle. |
+| 2026-08-02 | Phase 7 RL Agent (Fallback fix) | Lopunny/Froslass | **186.0** | N/A | Survived with minCount fix, but performance dropped slightly. |
+| 2026-08-02 | Phase 1 Heuristic Pivot | Lopunny/Froslass | **51.4** | N/A | Very low score for pure heuristic on this deck. |
+| 2026-08-02 | Phase 8 Heuristic | Lopunny/Froslass | **ERROR** | N/A | Errored out. |
+| 2026-08-02 | Phase 9 RL Agent (BC init) | Lopunny/Froslass | **282.3** | N/A | Great score! RL agent initialized from BC, getting very close to the 303.6 peak! |

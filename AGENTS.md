@@ -90,12 +90,11 @@ runtime. Crashes observed in Phase 2 were **Turn 0 deck-submission bugs**, not m
 
 ## Current status
 
-Phase 2 deployed. RL pipeline (PPO, NumPy inference, Gymnasium env wrapper) is functional and
-successfully running matches on Kaggle. Phase 3 (at-scale self-play + competitive deck) next.
+Phase 9 completed. RL pipeline with Behavioral Cloning initialization achieved a solid 282.3 on the ladder with the Lopunny/Froslass deck. We are currently executing a diverse Meta Opponent Curriculum to push past the Phase 2 peak.
 
-- Real ladder rating after Phase 2 (Pure Numpy Fix) submission: **303.6**
-- Phase 1 v3 baseline (rule-based, first working): **170.1**
-- Phase 3 target: beat **303.6** on the real ladder before promoting to `main.py`.
+- **Current Peak (Phase 2): 303.6**
+- **Recent Best (Phase 9 BC Init): 282.3**
+- **Next Target:** Beat 303.6 using the diverse meta-opponent curriculum.
 
 ## Local Hardware Specs
 - CPU: AMD Ryzen 5 5600H (12 logical cores)

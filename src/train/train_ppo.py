@@ -31,8 +31,8 @@ from src.agent.rule_based_bellibolt import rule_based_bellibolt
 STATE_DIM       = ObservationEncoder.STATE_DIM   # 167
 ACTION_DIM      = MAX_ACTION_SPACE               # 150
 HIDDEN_DIM      = 256
-N_WORKERS       = 8          # parallel envs (tune to your CPU core count)
-EPISODES        = 50_000    # full training run (reduced for faster execution)
+N_WORKERS       = 9          # parallel envs (tune to your CPU core count)
+EPISODES        = 50_000   
 MAX_STEPS       = 300        # max steps per episode
 GAMMA           = 0.99
 CLIP_RATIO      = 0.2
@@ -50,7 +50,15 @@ def _load_deck_from_csv(path="deck.csv"):
         return [int(line.strip()) for line in f if line.strip() and not line.startswith("#")]
 SNORLAX_DECK = _load_deck_from_csv()
 
-ALL_DECKS = [_load_deck_from_csv("deck.csv")]
+ALL_DECKS = []
+import glob
+for p in glob.glob("decks/meta_*.csv"):
+    try:
+        ALL_DECKS.append(_load_deck_from_csv(p))
+    except:
+        pass
+if not ALL_DECKS:
+    ALL_DECKS = [SNORLAX_DECK]
 
 # ─── Model ────────────────────────────────────────────────────────────────────
 
@@ -86,7 +94,7 @@ def env_worker(worker_id: int, conn: mp.connection.Connection, all_decks: list):
     import random
 
     pool = SelfPlayPool()
-    env = FastPTCGEnv(rl_deck=random.choice(all_decks), opp_deck=random.choice(all_decks))
+    env = FastPTCGEnv(rl_deck=SNORLAX_DECK, opp_deck=random.choice(all_decks))
     env.set_opponent_agent(pool.sample_opponent())
     obs, _ = env.reset()
     conn.send(('obs', obs))
@@ -292,11 +300,10 @@ def train():
                         probs /= probs.sum()
                         
                         sampled_opp_idx = np.random.choice(len(ALL_DECKS), p=probs)
-                        sampled_rl_idx = np.random.choice(len(ALL_DECKS))
                         current_opp_deck_idx[i] = sampled_opp_idx
                         
                         # Tell worker to reset with specific decks
-                        parent_conns[i].send(('reset', ALL_DECKS[sampled_rl_idx], ALL_DECKS[sampled_opp_idx]))
+                        parent_conns[i].send(('reset', SNORLAX_DECK, ALL_DECKS[sampled_opp_idx]))
                         tag, new_obs = parent_conns[i].recv()
                         obs_list[i] = new_obs
 
