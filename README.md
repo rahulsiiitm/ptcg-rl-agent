@@ -37,14 +37,23 @@
 
 ## Competition Strategy Overview
 
-<img src="https://assets.pokemon.com/assets/cms2/img/pokedex/full/658.png" width="200" align="right" alt="Greninja">
-
-This repository houses our experimental pipeline for the Kaggle Pokémon TCG AI Battle Challenge. We are utilizing a **PPO Reinforcement Learning (RL) Policy** heavily augmented by a **Safety Fallback Heuristic**.
-
+<table>
+<tr>
+<td valign="top" width="75%">
+This repository houses our experimental pipeline for the Kaggle Pokémon TCG AI Battle Challenge. We are utilizing a <strong>PPO Reinforcement Learning (RL) Policy</strong> heavily augmented by a <strong>Safety Fallback Heuristic</strong>.
+<br><br>
 Rather than attempting to build a generalized bot that can play any deck (which historically fails due to combinatorial explosion and complex card interactions), our strategic focus is:
-1. **Deck Simplicity:** Pilot a simple, robust, high-consistency deck (e.g., Mono-Water Basic, Snorlax Control) that minimizes dead hands.
-2. **Crash-Proof Safety:** The engine drops any submission that raises an exception. We utilize aggressive `try/except` fallbacks that automatically inspect the `cabt` engine's `minCount` and return legal dummy actions to survive edge-cases.
-3. **Pure-NumPy Inference:** The Kaggle runtime has a strict 600s time budget. We train via PyTorch (CUDA) locally but export weights to `.npz` for ultra-fast, zero-overhead pure-NumPy inference on the Kaggle servers.
+<ol>
+<li><strong>Deck Simplicity:</strong> Pilot a simple, robust, high-consistency deck (e.g., Mono-Water Basic, Snorlax Control) that minimizes dead hands.</li>
+<li><strong>Crash-Proof Safety:</strong> The engine drops any submission that raises an exception. We utilize aggressive <code>try/except</code> fallbacks that automatically inspect the <code>cabt</code> engine's <code>minCount</code> and return legal dummy actions to survive edge-cases.</li>
+<li><strong>Pure-NumPy Inference:</strong> The Kaggle runtime has a strict 600s time budget. We train via PyTorch (CUDA) locally but export weights to <code>.npz</code> for ultra-fast, zero-overhead pure-NumPy inference on the Kaggle servers.</li>
+</ol>
+</td>
+<td valign="top" width="25%" align="center">
+<img src="https://assets.pokemon.com/assets/cms2/img/pokedex/full/658.png" width="200" alt="Greninja">
+</td>
+</tr>
+</table>
 
 ---
 
@@ -98,11 +107,19 @@ kaggle competitions submit -c pokemon-tcg-ai-battle -f submission.tar.gz -m "Pha
 
 ## System Architecture
 
-<img src="https://assets.pokemon.com/assets/cms2/img/pokedex/full/025.png" width="200" align="right" alt="Pikachu">
+<table>
+<tr>
+<td valign="center" width="25%" align="center">
+<img src="https://assets.pokemon.com/assets/cms2/img/pokedex/full/025.png" width="200" alt="Pikachu">
+</td>
+<td valign="center" width="75%">
 
 ### 1. Training Curriculum (Local PyTorch)
-
 To ensure the agent generalizes against the entire tier-1 meta without forgetting how to pilot its own deck, training utilizes a **50/50 Hybrid Curriculum**:
+
+</td>
+</tr>
+</table>
 
 ```mermaid
 graph TD
