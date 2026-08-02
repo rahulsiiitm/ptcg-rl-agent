@@ -22,8 +22,6 @@ LILLIE_ID = 1227
 WALLY_ID = 1229
 HAND_TRIMMER_ID = 1087
 BATTLE_CAGE_ID = 1264
-WATER_ENERGY_ID = 3
-MIST_ENERGY_ID = 11
 
 # ─── Option type constants from cabt API ─────────────────────────────────────
 OPT_ATTACK  = 13

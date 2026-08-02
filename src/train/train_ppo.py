@@ -291,6 +291,7 @@ def train():
                     if done:
                         encoders[i].reset()
                 
+                
                 # Append to buffers
                 batch_states.append(state_t)
                 batch_actions.append(actions)
@@ -341,6 +342,7 @@ def train():
                         obs_list[i] = new_obs
 
                         if ep % 50 == 0:
+                            torch.cuda.empty_cache()
                             win_rate = total_wins / max(1, ep - START_EP)
                             dt = time.time() - t0
                             print(f"Ep: {ep} | WR: {win_rate:.2f} | Time: {dt:.1f}s", flush=True)

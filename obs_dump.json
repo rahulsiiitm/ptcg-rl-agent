@@ -1,0 +1,69 @@
+{
+  "select": {
+    "type": 9,
+    "context": 41,
+    "minCount": 1,
+    "maxCount": 1,
+    "remainDamageCounter": 0,
+    "remainEnergyCost": 0,
+    "option": [
+      {
+        "type": 1
+      },
+      {
+        "type": 2
+      }
+    ],
+    "deck": null,
+    "contextCard": null,
+    "effect": null
+  },
+  "logs": [],
+  "current": {
+    "turn": 0,
+    "turnActionCount": 1,
+    "yourIndex": 0,
+    "firstPlayer": -1,
+    "supporterPlayed": false,
+    "stadiumPlayed": false,
+    "energyAttached": false,
+    "retreated": false,
+    "result": -1,
+    "stadium": [],
+    "looking": null,
+    "players": [
+      {
+        "active": [],
+        "bench": [],
+        "benchMax": 5,
+        "deckCount": 60,
+        "discard": [],
+        "prize": [],
+        "handCount": 0,
+        "hand": [],
+        "poisoned": false,
+        "burned": false,
+        "asleep": false,
+        "paralyzed": false,
+        "confused": false
+      },
+      {
+        "active": [],
+        "bench": [],
+        "benchMax": 5,
+        "deckCount": 60,
+        "discard": [],
+        "prize": [],
+        "handCount": 0,
+        "hand": null,
+        "poisoned": false,
+        "burned": false,
+        "asleep": false,
+        "paralyzed": false,
+        "confused": false
+      }
+    ]
+  },
+  "search_begin_input": "AGEAjD/AGEAboqAGEAEB-+CB7-pIDw-UM8-fIB-VEQ-VBL-+BI-UBBCw*jiGgAEEAPI-KBQADE0AWQCpAG==",
+  "step": 1
+}
