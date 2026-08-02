@@ -45,7 +45,7 @@ def train_bc(dataset_path="data/replays_dataset.pt", epochs=50, batch_size=32, l
             
             optimizer.zero_grad()
             
-            logits, _ = model(batch_states)
+            logits, _, _ = model(batch_states)
             
             # Mask out invalid actions by setting their logits to a large negative number
             # Using -1e9 instead of -inf to avoid NaN in softmax/cross_entropy

@@ -71,6 +71,7 @@ OPT_EVOLVE  = 9
 OPT_PLAY    = 7
 OPT_ATTACH  = 8
 OPT_ABILITY = 10
+OPT_RETREAT = 12
 OPT_END     = 14
 
 SELECT_MAIN   = 0
@@ -511,9 +512,9 @@ def _pick_retreat(options: list, me: dict) -> int | None:
     §3.7 — Retreat option. Engine presents RETREAT as a MAIN option type.
     We pick retreat only when signalled by _should_retreat_for_kilowattrel.
     """
-    # Retreat usually appears as type=11 or may be a PLAY card (Switch)
+    # Retreat is type=12
     retreat_opts = [(i, opt) for i, opt in enumerate(options)
-                    if isinstance(opt, dict) and opt.get("type") == 11]
+                    if isinstance(opt, dict) and opt.get("type") == OPT_RETREAT]
     if retreat_opts:
         return retreat_opts[0][0]
     return None
@@ -785,7 +786,7 @@ def rule_based_bellibolt(obs_dict: dict) -> list[int]:
                     return result
 
             # 6. Attack
-            attack_idx = _pick_attack(options, me, opp)
+            attack_idx = _pick_attack(options, me, opp, obs_dict)
             if attack_idx is not None:
                 result = [attack_idx]
                 _debug_log(step, select_ctx, select_type, len(options), result)

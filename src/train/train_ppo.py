@@ -32,7 +32,7 @@ STATE_DIM       = ObservationEncoder.STATE_DIM   # 167
 ACTION_DIM      = MAX_ACTION_SPACE               # 150
 HIDDEN_DIM      = 256
 N_WORKERS       = 8          # parallel envs (tune to your CPU core count)
-EPISODES        = 10_000    # full training run (reduced for faster execution)
+EPISODES        = 50_000    # full training run (reduced for faster execution)
 MAX_STEPS       = 300        # max steps per episode
 GAMMA           = 0.99
 CLIP_RATIO      = 0.2
@@ -50,10 +50,7 @@ def _load_deck_from_csv(path="deck.csv"):
         return [int(line.strip()) for line in f if line.strip() and not line.startswith("#")]
 SNORLAX_DECK = _load_deck_from_csv()
 
-ALL_DECKS = []
-import glob
-for p in glob.glob("decks/meta_*.csv"):
-    ALL_DECKS.append(_load_deck_from_csv(p))
+ALL_DECKS = [_load_deck_from_csv("deck.csv")]
 
 # ─── Model ────────────────────────────────────────────────────────────────────
 
@@ -141,8 +138,11 @@ def train():
     encoders = [ObservationEncoder() for _ in range(N_WORKERS)]
     model   = ActorCritic(state_dim=STATE_DIM, action_dim=ACTION_DIM, hidden=HIDDEN_DIM).to(device)
     
-    # Resume from previous run if it exists
-    if os.path.exists("models/ppo_phase7.pth"):
+    # Resume from BC pre-training if it exists
+    if os.path.exists("models/bc_model.pth"):
+        model.load_state_dict(torch.load("models/bc_model.pth", map_location=device, weights_only=True), strict=False)
+        print("Resuming from existing models/bc_model.pth checkpoint!")
+    elif os.path.exists("models/ppo_phase7.pth"):
         model.load_state_dict(torch.load("models/ppo_phase7.pth", map_location=device, weights_only=True), strict=False)
         print("Resuming from existing models/ppo_phase7.pth checkpoint!")
         

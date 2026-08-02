@@ -7,10 +7,10 @@ if '__file__' in globals():
 else:
     sys.path.append('/kaggle_simulations/agent')
 
-from src.agent.hybrid_agent import hybrid_agent
+from src.agent.policy import policy_agent
 
 def agent(obs_dict):
     """
-    Kaggle entrypoint for the PTCG environment.
+    Kaggle entrypoint for the PTCG environment (RL Agent).
     """
-    return hybrid_agent(obs_dict)
+    return policy_agent(obs_dict)
