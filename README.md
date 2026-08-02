@@ -149,20 +149,53 @@ Full submission history → [`eval/ladder_log.md`](eval/ladder_log.md)
 
 ---
 
-## Phase 2 Architecture
+## System Architecture
 
-### Key Design Decisions
+### 1. Training Curriculum (Local PyTorch)
 
-> **Environment Context**: The `cabt` environment is built `FROM gcr.io/kaggle-images/python:v163` — the full Kaggle Python image. **PyTorch IS available** at the Kaggle runtime. Phase 2 crashes were identified as Turn 0 deck-submission exceptions, not import resolution errors. Phase 3 can safely `import torch` directly in `policy.py`.
+To ensure the agent generalizes against the entire tier-1 meta without forgetting how to pilot its own deck, training utilizes a **50/50 Hybrid Curriculum**:
 
-We utilize **pure NumPy inference** in Phase 2 to ensure a fast cold-start, training with PyTorch locally and exporting the network weights to `.npz`:
+```mermaid
+graph TD
+    subgraph PyTorch PPO Training
+        SE[State Encoder<br/>24-dim Float32] --> ActorCritic[Actor-Critic MLP<br/>24 → 128 → 128 → 150]
+        ActorCritic --> AM[Action Masking<br/>Softmax Filter]
+    end
 
+    subgraph FastPTCGEnv [Gymnasium Wrapper]
+        Engine[cabt C++ Engine]
+        AM <-->|Action / Obs| Engine
+    end
+
+    subgraph Matchmaking [50% Split]
+        Engine <-->|P1| SelfPlay[Self-Play Pool<br/>Mirror Matches]
+        Engine <-->|P1| Generic[Generic Agent<br/>24 Meta Decks]
+    end
+    
+    style ActorCritic fill:#EE4C2C,stroke:#333,color:#fff
+    style Engine fill:#FF6B35,stroke:#333,color:#fff
 ```
-┌──────────────────────┐     export     ┌────────────────────────┐
-│  train_ppo.py        │ ─────npz──────▶│  policy.py (Kaggle)    │
-│  PyTorch + CUDA      │                │  Pure NumPy forward    │
-│  RTX 3050 (local)    │                │  relu(W·x + b) × 3     │
-└──────────────────────┘                └────────────────────────┘
+
+- **Self-Play Pool:** Prevents strategy collapse. The agent learns the fundamental mechanics (shadowboxing) by playing against past checkpoints of itself.
+- **Generic Meta Agent:** The `rule_based_generic.py` agent acts as the ultimate gatekeeper, utilizing "True Sight" (database lookups) to pilot 24 highly-optimized, tier-1 meta decks flawlessly.
+
+### 2. Inference Pipeline (Kaggle Deployment)
+
+> **Environment Context**: The `cabt` environment is built `FROM gcr.io/kaggle-images/python:v163` — the full Kaggle Python image. **PyTorch IS available** at the Kaggle runtime. However, we utilize **pure NumPy inference** to ensure an ultra-fast cold-start and to avoid memory fragmentation over the 10-minute game limit.
+
+```mermaid
+graph LR
+    JSON[cabt JSON Obs] --> Encoder[state_encoder.py<br/>Float32 Vector]
+    JSON -.->|True Sight Lookups| RBG[rule_based_generic.py<br/>Safety Fallback]
+    
+    Encoder --> Policy[policy.py<br/>NumPy Forward Pass]
+    Policy --> Mask[action_mask.py<br/>Zero-out illegals]
+    
+    Mask --> Output[Kaggle Action Index]
+    RBG -.->|If NN fails| Output
+    
+    style Policy fill:#3776AB,stroke:#333,color:#fff
+    style RBG fill:#22C55E,stroke:#333,color:#fff
 ```
 
 ### RL Pipeline Components
@@ -181,9 +214,9 @@ We utilize **pure NumPy inference** in Phase 2 to ensure a fast cold-start, trai
 | Limitation | Phase 3 Solution |
 |---|---|
 | 24-dim state (no HP, type, moves) | Expand to ~128-dim encoder |
-| Only 50 training episodes | 100k+ episodes with parallel envs |
-| No self-play | Checkpoint pool self-play |
-| Weak mono-basic deck | Snorlax control deck |
+| Only 50 training episodes | **Complete:** 100k+ episodes with 9-worker parallel envs |
+| No self-play | **Complete:** Hybrid Checkpoint pool + Meta Decks |
+| Weak mono-basic deck | **Complete:** Snorlax/Lopunny control deck |
 
 ---
 
