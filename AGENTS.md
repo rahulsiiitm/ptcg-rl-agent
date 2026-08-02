@@ -78,6 +78,7 @@ outside the project — it's subject to competition rules.
   for every RL version, given the known mismatch risk.
 - Never promote a Phase 2 agent to `main.py` unless its real ladder score beats 
   the Phase 1 rule-based baseline's real ladder score.
+- **PROACTIVE DOCUMENTATION:** Always proactively keep all core documentation (`strategy_writeup.md`, `README.md`, `decks/deck_rationale.md`) synced and up-to-date with the latest architectural changes, Phase transitions, and insights without waiting for explicit prompts.
 
 ## Critical Runtime Fact
 
