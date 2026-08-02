@@ -39,7 +39,7 @@
 
 <table>
 <tr>
-<td valign="middle" width="75%">
+<td valign="middle" width="85%">
 This repository houses our experimental pipeline for the Kaggle Pokémon TCG AI Battle Challenge. We are utilizing a <strong>PPO Reinforcement Learning (RL) Policy</strong> heavily augmented by a <strong>Safety Fallback Heuristic</strong>.
 <br><br>
 Rather than attempting to build a generalized bot that can play any deck (which historically fails due to combinatorial explosion and complex card interactions), our strategic focus is:
@@ -49,7 +49,7 @@ Rather than attempting to build a generalized bot that can play any deck (which 
 <li><strong>Pure-NumPy Inference:</strong> The Kaggle runtime has a strict 600s time budget. We train via PyTorch (CUDA) locally but export weights to <code>.npz</code> for ultra-fast, zero-overhead pure-NumPy inference on the Kaggle servers.</li>
 </ol>
 </td>
-<td valign="middle" width="25%" align="center">
+<td valign="middle" width="15%" align="center">
 <img src="https://play.pokemonshowdown.com/sprites/ani/greninja.gif" width="150" alt="Greninja">
 </td>
 </tr>
@@ -61,7 +61,7 @@ Rather than attempting to build a generalized bot that can play any deck (which 
 
 <table>
 <tr>
-<td valign="middle" width="80%">
+<td valign="middle" width="85%">
 We follow a strict **phase-gated deployment cycle**: a new agent iteration is only promoted to the main submission file if it empirically out-scores the previous version on the *real* Kaggle ladder.
 
 | Phase | Status | Real Ladder Score | Core Contribution |
@@ -74,7 +74,7 @@ We follow a strict **phase-gated deployment cycle**: a new agent iteration is on
 
 Full submission history and local benchmarks → [`eval/ladder_log.md`](eval/ladder_log.md)
 </td>
-<td valign="middle" width="20%" align="center">
+<td valign="middle" width="15%" align="center">
 <img src="https://play.pokemonshowdown.com/sprites/ani/snorlax.gif" width="150" alt="Snorlax">
 </td>
 </tr>
@@ -118,10 +118,10 @@ kaggle competitions submit -c pokemon-tcg-ai-battle -f submission.tar.gz -m "Pha
 
 <table>
 <tr>
-<td valign="middle" width="25%" align="center">
+<td valign="middle" width="15%" align="center">
 <img src="https://play.pokemonshowdown.com/sprites/ani/pikachu.gif" width="150" alt="Pikachu">
 </td>
-<td valign="middle" width="75%">
+<td valign="middle" width="85%">
 
 ### 1. Training Curriculum (Local PyTorch)
 To ensure the agent generalizes against the entire tier-1 meta without forgetting how to pilot its own deck, training utilizes a **50/50 Hybrid Curriculum**:
@@ -189,10 +189,10 @@ graph LR
 
 <table>
 <tr>
-<td valign="middle" width="20%" align="center">
+<td valign="middle" width="15%" align="center">
 <img src="https://play.pokemonshowdown.com/sprites/ani/mewtwo.gif" width="150" alt="Mewtwo">
 </td>
-<td valign="middle" width="80%">
+<td valign="middle" width="85%">
 
 ### 1. State Encoding (`state_encoder.py`)
 The `cabt` engine provides observations as deeply nested, variable-length JSON objects containing hidden strings and raw IDs. Our state encoder squashes this imperfect-information tree into a **24-dimensional dense Float32 vector** suitable for an MLP:
@@ -230,7 +230,7 @@ The logits are then passed through `action_mask.py` which forcefully sets `logit
 
 <table>
 <tr>
-<td valign="middle" width="80%">
+<td valign="middle" width="85%">
 
 | Limitation | Phase 3 Solution |
 |---|---|
@@ -240,7 +240,7 @@ The logits are then passed through `action_mask.py` which forcefully sets `logit
 | Weak mono-basic deck | **Complete:** Snorlax/Mega Lucario control deck |
 
 </td>
-<td valign="middle" width="20%" align="center">
+<td valign="middle" width="15%" align="center">
 <img src="https://play.pokemonshowdown.com/sprites/ani/lucario-mega.gif" width="150" alt="Mega Lucario">
 </td>
 </tr>
