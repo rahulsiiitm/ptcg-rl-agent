@@ -37,31 +37,21 @@
 
 ## Competition Strategy Overview
 
-<table>
-<tr>
-<td valign="middle" width="85%">
-This repository houses our experimental pipeline for the Kaggle Pokémon TCG AI Battle Challenge. We are utilizing a <strong>PPO Reinforcement Learning (RL) Policy</strong> heavily augmented by a <strong>Safety Fallback Heuristic</strong>.
-<br><br>
+<img src="https://play.pokemonshowdown.com/sprites/ani/greninja.gif" width="150" align="right" alt="Greninja">
+
+This repository houses our experimental pipeline for the Kaggle Pokémon TCG AI Battle Challenge. We are utilizing a **PPO Reinforcement Learning (RL) Policy** heavily augmented by a **Safety Fallback Heuristic**.
+
 Rather than attempting to build a generalized bot that can play any deck (which historically fails due to combinatorial explosion and complex card interactions), our strategic focus is:
-<ol>
-<li><strong>Deck Simplicity:</strong> Pilot a simple, robust, high-consistency deck (e.g., Mono-Water Basic, Snorlax Control) that minimizes dead hands.</li>
-<li><strong>Crash-Proof Safety:</strong> The engine drops any submission that raises an exception. We utilize aggressive <code>try/except</code> fallbacks that automatically inspect the <code>cabt</code> engine's <code>minCount</code> and return legal dummy actions to survive edge-cases.</li>
-<li><strong>Pure-NumPy Inference:</strong> The Kaggle runtime has a strict 600s time budget. We train via PyTorch (CUDA) locally but export weights to <code>.npz</code> for ultra-fast, zero-overhead pure-NumPy inference on the Kaggle servers.</li>
-</ol>
-</td>
-<td valign="middle" width="15%" align="center">
-<img src="https://play.pokemonshowdown.com/sprites/ani/greninja.gif" width="150" alt="Greninja">
-</td>
-</tr>
-</table>
+1. **Deck Simplicity:** Pilot a simple, robust, high-consistency deck (e.g., Lopunny/Snorlax Control) that minimizes dead hands.
+2. **Crash-Proof Safety:** The engine drops any submission that raises an exception. We utilize aggressive `try/except` fallbacks that automatically inspect the `cabt` engine's `minCount` and return legal dummy actions to survive edge-cases.
+3. **Pure-NumPy Inference:** The Kaggle runtime has a strict 600s time budget. We train via PyTorch (CUDA) locally but export weights to `.npz` for ultra-fast, zero-overhead pure-NumPy inference on the Kaggle servers.
 
 ---
 
 ## Phase Status and Ladder Results
 
-<table>
-<tr>
-<td valign="middle" width="85%">
+<img src="https://play.pokemonshowdown.com/sprites/ani/snorlax.gif" width="150" align="right" alt="Snorlax">
+
 We follow a strict **phase-gated deployment cycle**: a new agent iteration is only promoted to the main submission file if it empirically out-scores the previous version on the *real* Kaggle ladder.
 
 | Phase | Status | Real Ladder Score | Core Contribution |
@@ -73,12 +63,8 @@ We follow a strict **phase-gated deployment cycle**: a new agent iteration is on
 | **Current** | In Progress | Target: **>303.6** | **Phase 3 Scaling:** Meta Opponent Curriculum & 100k+ parallel episode training. |
 
 Full submission history and local benchmarks → [`eval/ladder_log.md`](eval/ladder_log.md)
-</td>
-<td valign="middle" width="15%" align="center">
-<img src="https://play.pokemonshowdown.com/sprites/ani/snorlax.gif" width="150" alt="Snorlax">
-</td>
-</tr>
-</table>
+
+<br clear="both"/>
 
 ---
 
@@ -116,19 +102,11 @@ kaggle competitions submit -c pokemon-tcg-ai-battle -f submission.tar.gz -m "Pha
 
 ## System Architecture
 
-<table>
-<tr>
-<td valign="middle" width="15%" align="center">
-<img src="https://play.pokemonshowdown.com/sprites/ani/pikachu.gif" width="150" alt="Pikachu">
-</td>
-<td valign="middle" width="85%">
-
 ### 1. Training Curriculum (Local PyTorch)
-To ensure the agent generalizes against the entire tier-1 meta without forgetting how to pilot its own deck, training utilizes a **50/50 Hybrid Curriculum**:
 
-</td>
-</tr>
-</table>
+<img src="https://play.pokemonshowdown.com/sprites/ani/pikachu.gif" width="150" align="right" alt="Pikachu">
+
+To ensure the agent generalizes against the entire tier-1 meta without forgetting how to pilot its own deck, training utilizes a **50/50 Hybrid Curriculum**:
 
 ```mermaid
 graph TD
@@ -187,14 +165,10 @@ graph LR
 
 ## Model Deep Dive & Approach
 
-<table>
-<tr>
-<td valign="middle" width="15%" align="center">
-<img src="https://play.pokemonshowdown.com/sprites/ani/mewtwo.gif" width="150" alt="Mewtwo">
-</td>
-<td valign="middle" width="85%">
-
 ### 1. State Encoding (`state_encoder.py`)
+
+<img src="https://play.pokemonshowdown.com/sprites/ani/mewtwo.gif" width="150" align="right" alt="Mewtwo">
+
 The `cabt` engine provides observations as deeply nested, variable-length JSON objects containing hidden strings and raw IDs. Our state encoder squashes this imperfect-information tree into a **24-dimensional dense Float32 vector** suitable for an MLP:
 
 - **Global State (4 dims):** Current turn, step, remaining prizes for both players.
@@ -202,10 +176,6 @@ The `cabt` engine provides observations as deeply nested, variable-length JSON o
 - **Opponent State (10 dims):** Visible active HP, estimated hand size (via `opponent_model.py`), visible bench size, discard pile tracking.
 
 *Note: The 24-dim state is extremely compressed to prevent overfitting to specific deck IDs, forcing the model to learn abstract concepts like "board advantage" rather than "use card X."*
-
-</td>
-</tr>
-</table>
 
 ### 2. Reward Shaping (`reward.py`)
 To prevent sparse-reward stagnation (since Kaggle PTCG games can last 100+ steps), we use dense, shaped rewards:
@@ -228,9 +198,7 @@ The logits are then passed through `action_mask.py` which forcefully sets `logit
 
 ## Known Limitations & Phase 3 Roadmap
 
-<table>
-<tr>
-<td valign="middle" width="85%">
+<img src="https://play.pokemonshowdown.com/sprites/ani/lucario-mega.gif" width="150" align="right" alt="Mega Lucario">
 
 | Limitation | Phase 3 Solution |
 |---|---|
@@ -239,12 +207,7 @@ The logits are then passed through `action_mask.py` which forcefully sets `logit
 | No self-play | **Complete:** Hybrid Checkpoint pool + Meta Decks |
 | Weak mono-basic deck | **Complete:** Snorlax/Mega Lucario control deck |
 
-</td>
-<td valign="middle" width="15%" align="center">
-<img src="https://play.pokemonshowdown.com/sprites/ani/lucario-mega.gif" width="150" alt="Mega Lucario">
-</td>
-</tr>
-</table>
+<br clear="both"/>
 
 ## References
 - [cabt Engine Documentation](https://matsuoinstitute.github.io/cabt/)
