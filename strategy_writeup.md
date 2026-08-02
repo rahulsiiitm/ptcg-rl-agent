@@ -1,7 +1,7 @@
 # Pokémon TCG AI Battle Challenge: Strategy & Architecture Report
 
 ## Executive Summary
-Our approach breaks away from attempting to solve the entire Pokémon TCG game space. Traditional heuristic bots suffer from combinatorial explosion when playing complex decks, and pure deep-RL bots often timeout under Kaggle’s strict 600s inference limit or crash on illegal actions. We solved this with a hybrid architecture: a highly consistent **Snorlax/Lopunny Control Deck** piloted by a PyTorch-trained **PPO Agent**, deployed via a **Pure-NumPy Inference Pipeline** backed by a **Zero-Crash Heuristic Fallback System**.
+Our approach breaks away from attempting to solve the entire Pokémon TCG game space. Traditional heuristic bots suffer from combinatorial explosion when playing complex decks, and pure deep-RL bots often timeout under Kaggle’s strict 600s inference limit or crash on illegal actions. We solved this with a hybrid architecture: a highly consistent **Snorlax/Lopunny Control Deck** piloted entirely by a PyTorch-trained **Deep Reinforcement Learning (PPO) Agent**, deployed via a **Pure-NumPy Inference Pipeline**. To guarantee 100% stability, this deep neural network is backed by a **Zero-Crash Heuristic Fallback System** that only triggers if the neural network encounters a critical error.
 
 ---
 
@@ -56,4 +56,4 @@ Crucially, this entire inference block is wrapped in an aggressive `try/except` 
 ---
 
 ## Conclusion
-By combining an intentionally simplified Control Deck with an advanced RL architecture and a crash-proof deployment pipeline, our agent demonstrates a deep, strategic understanding of both the Pokémon TCG mechanics and the unique constraints of the Kaggle Simulation environment.
+By combining an intentionally simplified Control Deck with an advanced Deep Reinforcement Learning architecture and a crash-proof deployment pipeline, our agent demonstrates a deep, strategic understanding of both the Pokémon TCG mechanics and the unique constraints of the Kaggle Simulation environment.

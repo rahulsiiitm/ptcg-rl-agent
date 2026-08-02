@@ -90,11 +90,11 @@ runtime. Crashes observed in Phase 2 were **Turn 0 deck-submission bugs**, not m
 
 ## Current status
 
-Phase 9 completed. RL pipeline with Behavioral Cloning initialization achieved a solid 282.3 on the ladder with the Lopunny/Froslass deck. We are currently executing a diverse Meta Opponent Curriculum to push past the Phase 2 peak.
+Phase 10 underway. The RL pipeline successfully reached 40,000+ episodes and we deployed a fully-functional Pure-NumPy inference pipeline with a Zero-Crash fallback. We are continuing diverse Meta Opponent Curriculum to push the Snorlax/Lopunny Deep RL agent past the 303.6 peak.
 
 - **Current Peak (Phase 2): 303.6**
 - **Recent Best (Phase 9 BC Init): 282.3**
-- **Next Target:** Beat 303.6 using the diverse meta-opponent curriculum.
+- **Next Target:** Let the diverse meta-opponent curriculum run on the RTX 3050 over 100k+ episodes to achieve a >50% win rate against all tier-1 heuristic meta decks.
 
 ## Local Hardware Specs
 - CPU: AMD Ryzen 5 5600H (12 logical cores)
