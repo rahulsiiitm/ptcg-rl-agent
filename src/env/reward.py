@@ -42,16 +42,35 @@ def calculate_reward(prev_obs: dict, curr_obs: dict, done: bool) -> float:
         
         # 1. Taking Prize Cards (diff in prize array length)
         # Prizes start at 6 elements. Length goes down when prizes are taken.
-        p0_prizes_taken = len(p0_prev.get("prize", [])) - len(p0_curr.get("prize", []))
+        p0_prizes_taken = len(p0_prev.get("prize") or []) - len(p0_curr.get("prize") or [])
         if p0_prizes_taken > 0:
-            reward += 0.1 * p0_prizes_taken
+            reward += 0.2 * p0_prizes_taken # Increased from 0.1 for aggression
             if p0_prizes_taken >= 2:
                 reward += 0.1 # Multi-prize knockout bonus (V/ex)
             
-        p1_prizes_taken = len(p1_prev.get("prize", [])) - len(p1_curr.get("prize", []))
+        p1_prizes_taken = len(p1_prev.get("prize") or []) - len(p1_curr.get("prize") or [])
         if p1_prizes_taken > 0:
             reward -= 0.1 * p1_prizes_taken
             if p1_prizes_taken >= 2:
                 reward -= 0.1 # Multi-prize loss penalty
+                
+        # 2. Aggressive Play Incentives (Domination Style)
+        # A tiny step penalty forces the agent to win FAST and not waste turns.
+        reward -= 0.001 
+        
+        # Reward for attaching energy (building power)
+        def count_energy(player):
+            total_energy = 0
+            for area in ['active', 'bench']:
+                for pkmn in (player.get(area) or []):
+                    # We can't perfectly parse energy count from raw card IDs easily here
+                    # without the engine state, but we can reward playing cards from hand
+                    pass
+            return total_energy
+            
+        # Reward playing cards from hand (reduces hand size, builds board)
+        p0_hand_diff = len(p0_prev.get("hand") or []) - len(p0_curr.get("hand") or [])
+        if p0_hand_diff > 0:
+            reward += 0.001 * p0_hand_diff # Small reward for taking actions
             
     return float(reward)

@@ -4,7 +4,6 @@ import random
 import torch
 import numpy as np
 
-from src.agent.policy import policy_agent
 from src.agent.rule_based import rule_based_agent
 from src.agent.state_encoder import ObservationEncoder
 
@@ -12,7 +11,7 @@ from src.agent.state_encoder import ObservationEncoder
 _global_encoder = None
 
 class SelfPlayPool:
-    def __init__(self, pool_dir="models/pool", latest_model_path="models/ppo_phase7.pth"):
+    def __init__(self, pool_dir="models/pool", latest_model_path="models/ppo_latest.pth"):
         self.pool_dir = pool_dir
         self.latest_model_path = latest_model_path
         

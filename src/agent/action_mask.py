@@ -22,6 +22,22 @@ def get_action_mask(obs_dict: dict) -> np.ndarray:
     if num_options > 0:
         mask[:num_options] = True
         
+        # Heuristic Masking: Prevent skipping attacks.
+        # If the agent can ATTACK (type 13), mask out PASS_TURN (type 14).
+        has_attack = False
+        pass_turn_idx = -1
+        
+        for i, opt in enumerate(options):
+            if isinstance(opt, dict):
+                opt_type = opt.get("type")
+                if opt_type == 13: # ATTACK
+                    has_attack = True
+                elif opt_type == 14: # END TURN / PASS
+                    pass_turn_idx = i
+                    
+        if has_attack and pass_turn_idx != -1:
+            mask[pass_turn_idx] = False
+            
     return mask
 
 def sample_valid_action(logits: np.ndarray, obs_dict: dict) -> list[int]:

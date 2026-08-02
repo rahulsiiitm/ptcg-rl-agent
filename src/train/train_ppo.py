@@ -17,22 +17,21 @@ import numpy as np
 import multiprocessing as mp
 from multiprocessing import Pipe, Process
 import time
+import glob
 
-import os
-import sys
 # Add project root to sys.path dynamically
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from src.agent.state_encoder import ObservationEncoder
 from src.agent.action_mask import get_action_mask, MAX_ACTION_SPACE
-from src.agent.rule_based_bellibolt import rule_based_bellibolt
+from src.agent.rule_based_lopunny import rule_based_agent as expert_agent
 
 # ─── Hyperparameters ──────────────────────────────────────────────────────────
 STATE_DIM       = ObservationEncoder.STATE_DIM   # 167
 ACTION_DIM      = MAX_ACTION_SPACE               # 150
 HIDDEN_DIM      = 256
 N_WORKERS       = 9          # parallel envs (tune to your CPU core count)
-EPISODES        = 50_000   
+EPISODES        = 100_000
 MAX_STEPS       = 300        # max steps per episode
 GAMMA           = 0.99
 CLIP_RATIO      = 0.2
@@ -48,17 +47,19 @@ IMITATION_EPISODES = 20_000
 def _load_deck_from_csv(path="deck.csv"):
     with open(path, "r") as f:
         return [int(line.strip()) for line in f if line.strip() and not line.startswith("#")]
-SNORLAX_DECK = _load_deck_from_csv()
+
+DECK_DIR = "decks"
+SNORLAX_DECK = _load_deck_from_csv(os.path.join(DECK_DIR, "lopunny_froslass_ids.csv"))
 
 ALL_DECKS = []
-import glob
-for p in glob.glob("decks/meta_*.csv"):
+for p in glob.glob(os.path.join(DECK_DIR, "meta_*.csv")):
     try:
         ALL_DECKS.append(_load_deck_from_csv(p))
-    except:
-        pass
-if not ALL_DECKS:
-    ALL_DECKS = [SNORLAX_DECK]
+    except Exception as e:
+        print(f"Skipping {p}: {e}")
+
+if SNORLAX_DECK not in ALL_DECKS:
+    ALL_DECKS.append(SNORLAX_DECK)
 
 # ─── Model ────────────────────────────────────────────────────────────────────
 
@@ -146,13 +147,23 @@ def train():
     encoders = [ObservationEncoder() for _ in range(N_WORKERS)]
     model   = ActorCritic(state_dim=STATE_DIM, action_dim=ACTION_DIM, hidden=HIDDEN_DIM).to(device)
     
-    # Resume from BC pre-training if it exists
-    if os.path.exists("models/bc_model.pth"):
+    # Resume from latest checkpoint or BC pre-training
+    START_EP = 0
+    import glob
+    checkpoints = glob.glob("models/pool/checkpoint_*.pth")
+    if checkpoints:
+        # Sort by episode number
+        checkpoints.sort(key=lambda x: int(os.path.basename(x).split('_')[1].split('.')[0]), reverse=True)
+        latest_ckpt = checkpoints[0]
+        START_EP = int(os.path.basename(latest_ckpt).split('_')[1].split('.')[0])
+        model.load_state_dict(torch.load(latest_ckpt, map_location=device, weights_only=True), strict=False)
+        print(f"Resuming from {latest_ckpt} checkpoint at episode {START_EP}!")
+    elif os.path.exists("models/ppo_latest.pth"):
+        model.load_state_dict(torch.load("models/ppo_latest.pth", map_location=device, weights_only=True), strict=False)
+        print("Resuming from existing models/ppo_latest.pth checkpoint!")
+    elif os.path.exists("models/bc_model.pth"):
         model.load_state_dict(torch.load("models/bc_model.pth", map_location=device, weights_only=True), strict=False)
         print("Resuming from existing models/bc_model.pth checkpoint!")
-    elif os.path.exists("models/ppo_phase7.pth"):
-        model.load_state_dict(torch.load("models/ppo_phase7.pth", map_location=device, weights_only=True), strict=False)
-        print("Resuming from existing models/ppo_phase7.pth checkpoint!")
         
     optimizer = optim.Adam(model.parameters(), lr=LR)
 
@@ -182,7 +193,7 @@ def train():
         tag, obs = conn.recv()
         obs_list.append(obs)
 
-    ep = 0
+    ep = START_EP
     total_wins = 0
     t0 = time.time()
     
@@ -207,7 +218,7 @@ def train():
                 masks = []
                 expert_actions = []
                 for i, obs in enumerate(obs_list):
-                    expert_a = rule_based_bellibolt(obs)
+                    expert_a = expert_agent(obs)
                     expert_actions.append(expert_a[0] if expert_a else 0)
                     
                     mask = get_action_mask(obs)
@@ -308,7 +319,7 @@ def train():
                         obs_list[i] = new_obs
 
                         if ep % 50 == 0:
-                            win_rate = total_wins / ep
+                            win_rate = total_wins / max(1, ep - START_EP)
                             dt = time.time() - t0
                             print(f"Ep: {ep} | WR: {win_rate:.2f} | Time: {dt:.1f}s", flush=True)
                         
@@ -406,7 +417,9 @@ def train():
                     mb_log_probs = torch.stack(mb_log_probs)
                     
                     # Policy Loss (Clipped Surrogate Objective)
-                    ratio = torch.exp(mb_log_probs - mb_log_probs_old)
+                    # Clamp log_ratio to prevent exp() from overflowing and causing NaN gradients
+                    log_ratio = torch.clamp(mb_log_probs - mb_log_probs_old, min=-20.0, max=20.0)
+                    ratio = torch.exp(log_ratio)
                     surr1 = ratio * mb_advantages
                     surr2 = torch.clamp(ratio, 1.0 - CLIP_RATIO, 1.0 + CLIP_RATIO) * mb_advantages
                     actor_loss = -torch.min(surr1, surr2).mean()
@@ -425,9 +438,8 @@ def train():
                     # Auxiliary Q-Value Loss
                     # We train q_values to predict the advantage + value (which is mb_returns)
                     # For the actions actually taken, their Q-value should match the return.
-                    # mb_expert_actions are a proxy for the chosen actions in this simplified Q-head.
-                    # Or we can just use mb_returns directly mapped to the expert action.
-                    q_loss = nn.MSELoss()(q_values.gather(1, mb_expert_actions.unsqueeze(1)).squeeze(-1), mb_returns)
+                    mb_primary_actions = torch.tensor([flat_actions[idx][0] for idx in mb_idx], dtype=torch.long, device=device)
+                    q_loss = nn.MSELoss()(q_values.gather(1, mb_primary_actions.unsqueeze(1)).squeeze(-1), mb_returns)
                     
                     loss = actor_loss + critic_loss - ENTROPY_COEF * entropy + c2_imitation * imitation_loss + 0.5 * q_loss
                     
@@ -446,8 +458,8 @@ def train():
             if p.is_alive():
                 p.terminate()
 
-        torch.save(model.state_dict(), "models/ppo_phase7.pth")
-        print("Saved models/ppo_phase7.pth")
+        torch.save(model.state_dict(), "models/ppo_latest.pth")
+        print("Saved models/ppo_latest.pth")
         
         try:
             export_weights(model, "models/ppo_weights.npz")

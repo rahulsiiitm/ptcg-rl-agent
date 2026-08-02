@@ -73,8 +73,8 @@ def policy_agent(obs_dict: dict) -> list[int]:
         
         candidates = []
         
-        # 1. Look for phase7 weights (main current weight)
-        for p in [os.path.join(base_dir, "models", "ppo_phase7.pth"), "/kaggle_simulations/agent/models/ppo_phase7.pth"]:
+        # 1. Look for latest weights (main current weight)
+        for p in [os.path.join(base_dir, "models", "ppo_latest.pth"), "/kaggle_simulations/agent/models/ppo_latest.pth"]:
             if os.path.exists(p): candidates.append(p)
             
         # 2. Grab top 3 checkpoints from pool (highest episode numbers)
