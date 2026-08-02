@@ -37,6 +37,8 @@
 
 ## Competition Strategy Overview
 
+<img src="https://assets.pokemon.com/assets/cms2/img/pokedex/full/658.png" width="200" align="right" alt="Greninja">
+
 This repository houses our experimental pipeline for the Kaggle Pokémon TCG AI Battle Challenge. We are utilizing a **PPO Reinforcement Learning (RL) Policy** heavily augmented by a **Safety Fallback Heuristic**.
 
 Rather than attempting to build a generalized bot that can play any deck (which historically fails due to combinatorial explosion and complex card interactions), our strategic focus is:
@@ -95,6 +97,8 @@ kaggle competitions submit -c pokemon-tcg-ai-battle -f submission.tar.gz -m "Pha
 ---
 
 ## System Architecture
+
+<img src="https://assets.pokemon.com/assets/cms2/img/pokedex/full/025.png" width="200" align="right" alt="Pikachu">
 
 ### 1. Training Curriculum (Local PyTorch)
 
