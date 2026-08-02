@@ -8,6 +8,8 @@ try:
 except ImportError:
     CardLookup = None
 
+from src.agent.opponent_model import BayesianTracker
+
 TYPE_MAP = {
     '{G}': 0, '{R}': 1, '{W}': 2, '{L}': 3, '{P}': 4,
     '{F}': 5, '{D}': 6, '{M}': 7, '{C}': 8, '{N}': 9, '{Y}': 10,
@@ -38,17 +40,19 @@ class ObservationEncoder:
       Total State: 5 + 320 + 320 = 645
     Stacked State (4 frames): 645 * 4 = 2580
     """
-    SINGLE_STATE_DIM = 645
+    SINGLE_STATE_DIM = 658
     HISTORY_LEN = 4
     STATE_DIM = SINGLE_STATE_DIM * HISTORY_LEN
 
     def __init__(self):
         self.db = CardLookup() if CardLookup is not None else None
+        self.opp_model = BayesianTracker()
         self.reset()
 
     def reset(self):
         self.history = []
         self.last_step = -1
+        self.opp_model = BayesianTracker()
 
     def _get_type_onehot(self, t_str: str) -> np.ndarray:
         vec = np.zeros(NUM_TYPES, dtype=np.float32)
@@ -165,7 +169,10 @@ class ObservationEncoder:
         me_encoded = encode_player(p_me)    # 57 + 260 + 3 = 320
         opp_encoded = encode_player(p_opp)  # 320
         
-        current_state = np.concatenate([global_feats, me_encoded, opp_encoded])
+        self.opp_model.update(obs_dict)
+        opp_tracker_feats = self.opp_model.get_features() # 13
+        
+        current_state = np.concatenate([global_feats, me_encoded, opp_encoded, opp_tracker_feats])
         
         # Frame stacking logic
         step = obs_dict.get('step', -1)

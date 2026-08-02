@@ -12,7 +12,7 @@ from src.agent.state_encoder import ObservationEncoder
 _global_encoder = None
 
 class SelfPlayPool:
-    def __init__(self, pool_dir="models/pool", latest_model_path="models/ppo_phase3.pth"):
+    def __init__(self, pool_dir="models/pool", latest_model_path="models/ppo_phase7.pth"):
         self.pool_dir = pool_dir
         self.latest_model_path = latest_model_path
         
@@ -60,6 +60,10 @@ class SelfPlayPool:
         Loads a PyTorch model from disk and returns an agent function that uses it.
         We instantiate a local ActorCritic network for the worker process.
         """
+        if not hasattr(self, "_model_cache"):
+            self._model_cache = {}
+            self._model_mtimes = {}
+
         # We need to import ActorCritic locally to avoid circular imports 
         # or multiprocessing pickling issues if passed from main
         from src.train.train_ppo import ActorCritic
@@ -72,21 +76,32 @@ class SelfPlayPool:
         # Action space max is 100 for now, should match MAX_ACTION_SPACE in train_ppo
         from src.agent.action_mask import MAX_ACTION_SPACE
         
-        model = ActorCritic(state_dim, MAX_ACTION_SPACE)
         try:
-            model.load_state_dict(torch.load(model_path, map_location='cpu', weights_only=True))
-        except Exception as e:
-            print(f"Failed to load {model_path}: {e}")
+            mtime = os.path.getmtime(model_path)
+        except OSError:
             return rule_based_agent
+
+        if model_path not in self._model_cache or self._model_mtimes.get(model_path) != mtime:
+            model = ActorCritic(state_dim, MAX_ACTION_SPACE)
+            try:
+                # strict=False allows loading even if q_critic is missing
+                model.load_state_dict(torch.load(model_path, map_location='cpu', weights_only=True), strict=False)
+                model.eval()
+                self._model_cache[model_path] = model
+                self._model_mtimes[model_path] = mtime
+            except Exception as e:
+                print(f"Failed to load {model_path}: {e}")
+                return rule_based_agent
+        else:
+            model = self._model_cache[model_path]
             
-        model.eval()
-        
         def agent(obs):
             state = encoder.encode(obs)
             state_t = torch.FloatTensor(state).unsqueeze(0)
             
             with torch.no_grad():
-                logits, _ = model(state_t)
+                outputs = model(state_t)
+                logits = outputs[0] # ActorCritic returns (actor, critic, q_critic)
                 logits = logits.squeeze(0).numpy()
                 
             from src.agent.action_mask import sample_valid_action

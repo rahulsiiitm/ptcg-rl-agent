@@ -18,11 +18,19 @@ def calculate_reward(prev_obs: dict, curr_obs: dict, done: bool) -> float:
     if done:
         result = curr.get("result", -1)
         if result == 0:
-            return 1.0  # Player 0 wins
+            reward += 1.0  # Player 0 wins
         elif result == 1:
-            return -1.0 # Player 1 wins
+            reward -= 1.0 # Player 1 wins
         elif result == 2:
-            return -0.1 # Draw (slight penalty to encourage winning)
+            reward -= 0.1 # Draw (slight penalty to encourage winning)
+            
+        # Heavy Bench-out penalty
+        p0_players = curr.get("players", [])
+        if len(p0_players) >= 2:
+            if result == 1 and len(p0_players[0].get("active", [])) == 0:
+                reward -= 0.5 # Extra penalty for getting benched out
+            if result == 0 and len(p0_players[1].get("active", [])) == 0:
+                reward += 0.5 # Extra reward for benching out opponent
             
     # Intermediate shaped rewards
     prev_players = prev.get("players", [])
@@ -37,9 +45,13 @@ def calculate_reward(prev_obs: dict, curr_obs: dict, done: bool) -> float:
         p0_prizes_taken = len(p0_prev.get("prize", [])) - len(p0_curr.get("prize", []))
         if p0_prizes_taken > 0:
             reward += 0.1 * p0_prizes_taken
+            if p0_prizes_taken >= 2:
+                reward += 0.1 # Multi-prize knockout bonus (V/ex)
             
         p1_prizes_taken = len(p1_prev.get("prize", [])) - len(p1_curr.get("prize", []))
         if p1_prizes_taken > 0:
             reward -= 0.1 * p1_prizes_taken
+            if p1_prizes_taken >= 2:
+                reward -= 0.1 # Multi-prize loss penalty
             
     return float(reward)

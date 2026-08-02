@@ -577,6 +577,9 @@ def _handle_card_select(select_data: dict, me: dict, opp: dict) -> list[int]:
     # ── Setup bench: place Basics on bench at game start ──────────────────────
     if _ctx_matches(ctx, CTX_SETUP_BENCH, _STR_CTX_SETUP_BENCH):
         picks = _pick_setup_bench(options)
+        min_count = select_data.get("minCount", 1)
+        if len(picks) < min_count and len(options) >= min_count:
+            return list(range(min_count))
         return picks[:max_count]
 
     # ── Bench placement mid-game (e.g. Buddy-Buddy Poffin resolves) ───────────
@@ -598,6 +601,10 @@ def _handle_card_select(select_data: dict, me: dict, opp: dict) -> list[int]:
         for i in range(len(options)):
             if i not in used and len(selected) < max_count:
                 selected.append(i)
+        # Final safety check against minCount
+        min_count = select_data.get("minCount", 1)
+        if len(selected) < min_count and len(options) >= min_count:
+            return list(range(min_count))
         return selected if selected else [0]
 
     # ── Card search (Ultra Ball / Master Ball / Love Ball result) ─────────────
@@ -669,7 +676,10 @@ def _handle_card_select(select_data: dict, me: dict, opp: dict) -> list[int]:
     if _ctx_matches(ctx, CTX_DISCARD_ENERGY, _STR_CTX_DISCARD_ENERGY):
         return [0]
 
-    # ── Unknown Card-select context: always safe to return [0] ───────────────
+    # ── Unknown Card-select context: always safe to return up to minCount ──────
+    min_count = select_data.get("minCount", 1)
+    if min_count > 1 and len(options) >= min_count:
+        return list(range(min_count))
     return [0]
 
 
@@ -803,7 +813,12 @@ def rule_based_bellibolt(obs_dict: dict) -> list[int]:
             select_data = obs_dict.get("select", {}) if obs_dict else {}
             opts = select_data.get("option", []) if select_data else []
             if opts:
-                return [0]
+                pass
         except Exception:
             pass
-        return []
+        # Respect minCount if possible, even on exception fallback
+        min_count = (obs_dict or {}).get("select", {}).get("minCount", 1)
+        opts_len = len((obs_dict or {}).get("select", {}).get("option", []))
+        if min_count > 1 and opts_len >= min_count:
+            return list(range(min_count))
+        return [0]

@@ -32,7 +32,7 @@ STATE_DIM       = ObservationEncoder.STATE_DIM   # 167
 ACTION_DIM      = MAX_ACTION_SPACE               # 150
 HIDDEN_DIM      = 256
 N_WORKERS       = 8          # parallel envs (tune to your CPU core count)
-EPISODES        = 100_000    # full training run
+EPISODES        = 10_000    # full training run (reduced for faster execution)
 MAX_STEPS       = 300        # max steps per episode
 GAMMA           = 0.99
 CLIP_RATIO      = 0.2
@@ -50,11 +50,10 @@ def _load_deck_from_csv(path="deck.csv"):
         return [int(line.strip()) for line in f if line.strip() and not line.startswith("#")]
 SNORLAX_DECK = _load_deck_from_csv()
 
-OPPONENT_DECKS = [SNORLAX_DECK]
+ALL_DECKS = []
 import glob
-for p in glob.glob("decks/opp_deck_*.csv"):
-    OPPONENT_DECKS.append(_load_deck_from_csv(p))
-ALL_DECKS = OPPONENT_DECKS
+for p in glob.glob("decks/meta_*.csv"):
+    ALL_DECKS.append(_load_deck_from_csv(p))
 
 # ─── Model ────────────────────────────────────────────────────────────────────
 
@@ -67,10 +66,11 @@ class ActorCritic(nn.Module):
         )
         self.actor  = nn.Linear(hidden, action_dim)
         self.critic = nn.Linear(hidden, 1)
+        self.q_critic = nn.Linear(hidden, action_dim)
 
     def forward(self, x):
         h = self.shared(x)
-        return self.actor(h), self.critic(h)
+        return self.actor(h), self.critic(h), self.q_critic(h)
 
 
 # ─── Worker process ───────────────────────────────────────────────────────────
@@ -96,9 +96,9 @@ def env_worker(worker_id: int, conn: mp.connection.Connection, all_decks: list):
 
     while True:
         msg = conn.recv()
-        if msg == 'reset':
-            env.set_rl_deck(random.choice(all_decks))
-            env.set_opponent_deck(random.choice(all_decks))
+        if isinstance(msg, tuple) and msg[0] == 'reset':
+            env.set_rl_deck(msg[1])
+            env.set_opponent_deck(msg[2])
             env.set_opponent_agent(pool.sample_opponent())
             obs, _ = env.reset()
             conn.send(('obs', obs))
@@ -142,9 +142,9 @@ def train():
     model   = ActorCritic(state_dim=STATE_DIM, action_dim=ACTION_DIM, hidden=HIDDEN_DIM).to(device)
     
     # Resume from previous run if it exists
-    if os.path.exists("models/ppo_phase3.pth"):
-        model.load_state_dict(torch.load("models/ppo_phase3.pth", map_location=device, weights_only=True))
-        print("Resuming from existing models/ppo_phase3.pth checkpoint!")
+    if os.path.exists("models/ppo_phase7.pth"):
+        model.load_state_dict(torch.load("models/ppo_phase7.pth", map_location=device, weights_only=True), strict=False)
+        print("Resuming from existing models/ppo_phase7.pth checkpoint!")
         
     optimizer = optim.Adam(model.parameters(), lr=LR)
 
@@ -177,6 +177,9 @@ def train():
     ep = 0
     total_wins = 0
     t0 = time.time()
+    
+    deck_stats = {idx: {'wins': 0, 'games': 0} for idx in range(len(ALL_DECKS))}
+    current_opp_deck_idx = [np.random.randint(len(ALL_DECKS)) for _ in range(N_WORKERS)]
 
     try:
         while ep < EPISODES:
@@ -190,7 +193,7 @@ def train():
                 state_t = torch.tensor(states, dtype=torch.float32).to(device)
                 
                 with torch.no_grad():
-                    logits, values = model(state_t)
+                    logits, values, q_values = model(state_t)
                     
                 actions, log_probs = [], []
                 masks = []
@@ -271,12 +274,29 @@ def train():
                     if done:
                         ep += 1
                         result = obs_list[i].get('current', {})
-                        if result:
-                            r = result.get('result', -1)
-                            if r == 0: total_wins += 1
+                        r = result.get('result', -1) if result else -1
                         
-                        # Tell worker to reset
-                        parent_conns[i].send('reset')
+                        deck_idx = current_opp_deck_idx[i]
+                        deck_stats[deck_idx]['games'] += 1
+                        if r == 0:
+                            total_wins += 1
+                            deck_stats[deck_idx]['wins'] += 1
+                        
+                        # Prioritized sampling: lower win rate = higher probability
+                        probs = []
+                        for d_idx in range(len(ALL_DECKS)):
+                            st = deck_stats[d_idx]
+                            wr = st['wins'] / max(1, st['games'])
+                            probs.append(1.0 - wr + 0.1) # Add 0.1 for exploration
+                        probs = np.array(probs)
+                        probs /= probs.sum()
+                        
+                        sampled_opp_idx = np.random.choice(len(ALL_DECKS), p=probs)
+                        sampled_rl_idx = np.random.choice(len(ALL_DECKS))
+                        current_opp_deck_idx[i] = sampled_opp_idx
+                        
+                        # Tell worker to reset with specific decks
+                        parent_conns[i].send(('reset', ALL_DECKS[sampled_rl_idx], ALL_DECKS[sampled_opp_idx]))
                         tag, new_obs = parent_conns[i].recv()
                         obs_list[i] = new_obs
 
@@ -295,7 +315,7 @@ def train():
             states = np.stack([encoders[i].encode(o) for i, o in enumerate(obs_list)])
             next_t = torch.tensor(states, dtype=torch.float32).to(device)
             with torch.no_grad():
-                _, next_values = model(next_t)
+                _, next_values, _ = model(next_t)
                 next_values = next_values.squeeze(-1)
             
             advantages = torch.zeros_like(batch_rewards[0]).to(device)
@@ -350,7 +370,7 @@ def train():
                     mb_advantages = b_advantages[mb_idx]
                     mb_expert_actions = b_expert_actions[mb_idx]
                     
-                    logits, values = model(mb_states)
+                    logits, values, q_values = model(mb_states)
                     values = values.squeeze(-1)
                     
                     # Recompute log probs for actions
@@ -395,7 +415,14 @@ def train():
                     # Imitation Loss
                     imitation_loss = nn.CrossEntropyLoss()(logits, mb_expert_actions)
                     
-                    loss = actor_loss + critic_loss - ENTROPY_COEF * entropy + c2_imitation * imitation_loss
+                    # Auxiliary Q-Value Loss
+                    # We train q_values to predict the advantage + value (which is mb_returns)
+                    # For the actions actually taken, their Q-value should match the return.
+                    # mb_expert_actions are a proxy for the chosen actions in this simplified Q-head.
+                    # Or we can just use mb_returns directly mapped to the expert action.
+                    q_loss = nn.MSELoss()(q_values.gather(1, mb_expert_actions.unsqueeze(1)).squeeze(-1), mb_returns)
+                    
+                    loss = actor_loss + critic_loss - ENTROPY_COEF * entropy + c2_imitation * imitation_loss + 0.5 * q_loss
                     
                     optimizer.zero_grad()
                     loss.backward()
@@ -412,8 +439,8 @@ def train():
             if p.is_alive():
                 p.terminate()
 
-        torch.save(model.state_dict(), "models/ppo_phase3.pth")
-        print("Saved models/ppo_phase3.pth")
+        torch.save(model.state_dict(), "models/ppo_phase7.pth")
+        print("Saved models/ppo_phase7.pth")
         
         try:
             export_weights(model, "models/ppo_weights.npz")

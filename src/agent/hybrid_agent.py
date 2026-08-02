@@ -79,8 +79,8 @@ def hybrid_agent(obs_dict: dict) -> list[int]:
             _model = _get_model(ObservationEncoder.STATE_DIM, MAX_ACTION_SPACE)
             
             for candidate in [
-                os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "models", "ppo_phase3.pth"),
-                "/kaggle_simulations/agent/models/ppo_phase3.pth",
+                os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "models", "ppo_phase7.pth"),
+                "/kaggle_simulations/agent/models/ppo_phase7.pth",
             ]:
                 if os.path.exists(candidate):
                     try:
