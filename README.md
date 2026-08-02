@@ -155,6 +155,36 @@ graph LR
 
 ---
 
+## Model Deep Dive & Approach
+
+### 1. State Encoding (`state_encoder.py`)
+The `cabt` engine provides observations as deeply nested, variable-length JSON objects containing hidden strings and raw IDs. Our state encoder squashes this imperfect-information tree into a **24-dimensional dense Float32 vector** suitable for an MLP:
+
+- **Global State (4 dims):** Current turn, step, remaining prizes for both players.
+- **Self State (10 dims):** Active Pokémon HP/MaxHP, total bench size, total energy attached across board, hand size, deck size, discard pile size.
+- **Opponent State (10 dims):** Visible active HP, estimated hand size (via `opponent_model.py`), visible bench size, discard pile tracking.
+
+*Note: The 24-dim state is extremely compressed to prevent overfitting to specific deck IDs, forcing the model to learn abstract concepts like "board advantage" rather than "use card X."*
+
+### 2. Reward Shaping (`reward.py`)
+To prevent sparse-reward stagnation (since Kaggle PTCG games can last 100+ steps), we use dense, shaped rewards:
+- **Terminal State:** `+1.0` for a Win, `-1.0` for a Loss, `-0.1` for a Draw.
+- **Catastrophic Failure:** Extra `-0.5` penalty if the agent loses via "Bench Out" (failing to bench basic Pokémon).
+- **Step Rewards (Dense):** `+0.1` for taking a Prize Card.
+
+### 3. Pure-NumPy Forward Pass (`policy.py`)
+Kaggle enforces a 600s time budget across potentially dozens of matches. Importing PyTorch alone costs 3-5 seconds of cold-start time. To guarantee we never timeout on Kaggle, the Actor network weights are exported from PyTorch as raw `.npz` arrays. 
+
+During inference, the policy uses raw NumPy matrix multiplications:
+```python
+x = np.maximum(0, state @ w['s1_w'].T + w['s1_b']) # ReLU Layer 1 (128)
+x = np.maximum(0, x @ w['s2_w'].T + w['s2_b'])     # ReLU Layer 2 (128)
+logits = x @ w['a_w'].T + w['a_b']                 # Actor Head (150)
+```
+The logits are then passed through `action_mask.py` which forcefully sets `logits[illegal_actions] = -1e9` before `argmax`, completely preventing the engine from crashing on illegal moves.
+
+---
+
 ## Known Limitations & Phase 3 Roadmap
 
 | Limitation | Phase 3 Solution |
