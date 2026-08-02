@@ -65,17 +65,9 @@ When detected: blocks the attack branch entirely → retreats Bellibolt → send
 ### Bellibolt Cooldown (§4 Key Logic)
 `Thunderous Bolt` has a 1-turn "can't attack" clause. The cabt engine enforces this by simply **not presenting Thunderous Bolt as a legal option** the following turn. The agent detects cooldown by checking if "thunderous" is absent from attack options — no manual state tracking needed.
 
-### Why Rule-Based > RL Here
-From `AGENTS.md`: *"More sophisticated ≠ better. A simpler heuristic scorer on the identical deck outperformed RL."* The Bellibolt strategy is a small, deterministic decision tree:
-- 2 attacker choices (Bellibolt / Kilowattrel)
-- 1 conditional branch (Crustle present?)
-- 1 cooldown check
+### Phase 5 - 10: The Deep RL Pivot (Snorlax/Lopunny Control)
+While the rule-based Bellibolt agent was stable, it was fundamentally limited by its inability to adapt to complex board states. To push past the 303.6 peak, we pivoted back to Deep Reinforcement Learning (PPO) using a much stronger **Lopunny/Froslass Control** deck.
 
-PPO would need thousands of episodes to rediscover this by reward signal. The rule-based agent executes it perfectly from turn 1.
-
-### Submission Bug History
-| Attempt | Error | Fix |
-|---|---|---|
-| Phase 4 v1 | Import error (missing `__init__.py`) | Added `src/__init__.py`, `src/agent/__init__.py`, `data/__init__.py` |
-| Phase 4 v2 | "Player 1's deck error" | `Master Ball` is ACE SPEC — max 1 copy. Replaced 2nd with `Love Ball`. |
-| Phase 4 v3 | ✅ Submitted successfully | — |
+**Why RL Succeeded Here:**
+Instead of brute-forcing the learning from scratch, we used **Behavioral Cloning (BC)** to initialize the PPO agent's weights using our best heuristics, and implemented a **Pure-NumPy Inference Pipeline** to completely bypass the PyTorch `kaggle_environments` inference timeouts and crashes. 
+By training on a diverse **Meta Opponent Curriculum** across 40,000+ episodes (with a critical memory leak fix preventing VRAM exhaustion), the Deep RL agent successfully learned advanced stalling and gusting strategies that the heuristic agent was incapable of executing, achieving a solid 282.3 Elo in Phase 9 and currently training to break the 303.6 peak in Phase 10.

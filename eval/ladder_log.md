@@ -19,3 +19,4 @@
 | 2026-08-02 | Phase 1 Heuristic Pivot | Lopunny/Froslass | **51.4** | N/A | Very low score for pure heuristic on this deck. |
 | 2026-08-02 | Phase 8 Heuristic | Lopunny/Froslass | **ERROR** | N/A | Errored out. |
 | 2026-08-02 | Phase 9 RL Agent (BC init) | Lopunny/Froslass | **282.3** | N/A | Great score! RL agent initialized from BC, getting very close to the 303.6 peak! |
+| 2026-08-02 | Phase 10 NumPy Pipeline | Lopunny/Froslass | **Pending** | N/A | PPO agent trained on diverse curriculum. Fixed CUDA VRAM memory leak in training loop! |
