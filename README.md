@@ -1,8 +1,5 @@
-<p align="center">
-  <img src="docs/banner.png" alt="PTCG AI Battle Agent" width="100%"/>
-</p>
-
-<h1 align="center">🃏 PTCG AI Battle Agent</h1>
+<h1 align="center"><img width="1024" height="384" alt="pokemongames-banner-1024x384" src="https://github.com/user-attachments/assets/7be6b89f-fd42-49a8-af15-7140c7d72c22" />
+PTCG AI Battle Agent</h1>
 
 <p align="center">
   <strong>Reinforcement Learning + Heuristic Agent for the Kaggle Pokémon TCG AI Battle Challenge</strong>
