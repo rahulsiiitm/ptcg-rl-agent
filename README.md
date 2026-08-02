@@ -35,122 +35,62 @@
 
 ---
 
-## Overview
+## Competition Strategy Overview
 
-A competitive **PPO Reinforcement Learning** agent for the Kaggle Pokémon TCG AI Battle Challenge. The agent is trained locally using PyTorch with CUDA acceleration and deployed to Kaggle using a pure-NumPy inference pipeline for maximum runtime compatibility.
+This repository houses our experimental pipeline for the Kaggle Pokémon TCG AI Battle Challenge. We are utilizing a **PPO Reinforcement Learning (RL) Policy** heavily augmented by a **Safety Fallback Heuristic**.
 
-The project follows a strict **phase-gated deployment cycle**: every new agent iteration must empirically outperform the previous production version on the real Kaggle ladder before being promoted to the `main.py` entrypoint.
-
-| Metric | Value |
-|---|---|
-| Best Ladder Score | **303.6** (Phase 2 RL) |
-| Submission Format | `submission.tar.gz` (main.py + deck.csv + src + models) |
-| Time Budget | 600s per match |
-| Deck Configuration | Mono-Water Basic (60 cards) |
-| Policy Architecture | PPO Actor-Critic (MLP 24→128→128→150) |
-| Training Hardware | AMD Ryzen 5 5600H + RTX 3050 (CUDA) |
-
----
-
-## Project Structure
-
-```
-ptcg-rl-agent/
-├── main.py                  # Thin Kaggle entrypoint (loads policy_agent)
-├── deck.csv                 # 60-card deck submitted with the agent
-├── src/
-│   ├── agent/
-│   │   ├── rule_based.py         # Phase 1: Heuristic rule-based agent
-│   │   ├── rule_based_generic.py # Universal "True Sight" opponent for all 24 meta decks
-│   │   ├── policy.py             # Phase 2: Pure-NumPy RL policy inference
-│   │   ├── state_encoder.py      # Encodes cabt JSON obs → flat float32 vector
-│   │   ├── action_mask.py        # Masks illegal actions from logits (NumPy)
-│   │   └── opponent_model.py     # Probabilistic opponent hand/deck tracker
-│   ├── env/
-│   │   ├── fast_sim.py         # Gymnasium wrapper around the C++ cg engine
-│   │   └── reward.py           # Shaped reward (win/loss + prizes + KOs)
-│   └── train/
-│       ├── train_ppo.py        # PPO training loop (PyTorch + CUDA)
-│       └── self_play.py        # Checkpoint pool for self-play training
-├── models/
-│   ├── ppo_baseline.pth        # PyTorch checkpoint (local training only)
-│   └── ppo_weights.npz         # NumPy exported weights (Kaggle inference)
-├── assets/
-│   └── banner.png              # Project banner
-├── decks/                   # Deck rationale and meta configurations
-├── eval/
-│   ├── ladder_log.md           # Real ladder submission log
-│   └── local_vs_ladder.md      # Local sim vs. ladder comparison
-└── scripts/                 # Build, validate, and submission helpers
-```
-
----
-
-## Training Methodology & Local Reproduction
-
-This repository contains the training and inference pipeline used to build our competition submission. It is structured as an experimental research project rather than a generalized library.
-
-### 1. Environment Setup
-
-To reproduce our local training environment (which uses a custom `cabt` C++ Gym wrapper):
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate        # Windows
-pip install -r requirements.txt
-```
-
-### 2. Dataset Acquisition
-
-The agent requires the official Kaggle competition card dataset to perform "True Sight" heuristics:
-
-```bash
-python -c "import kagglehub; kagglehub.competition_download('pokemon-tcg-ai-battle-challenge-strategy')"
-```
-Place `EN_Card_Data.csv` in the `data/` folder.
-
----
-
-## Agent Training & Verification
-
-### Training the PPO Model
-
-The core RL policy is trained using a highly parallelized PyTorch PPO loop:
-
-```bash
-.venv\Scripts\python src\train\train_ppo.py
-```
-This spawns multiple parallel environments and actively updates the model weights against a hybrid pool of past-self checkpoints and 24 hand-crafted meta decks. Weights are automatically exported to `models/ppo_weights.npz` to bypass PyTorch import overhead on Kaggle.
-
-### Local Simulation Sanity Check
-
-```bash
-.venv\Scripts\python tests\test_agent.py
-```
-Runs a local match to verify that the NumPy forward pass identically matches the PyTorch outputs and that the `cabt` engine does not throw illegal action exceptions.
-
-### Kaggle Submission Packaging
-
-```bash
-tar -czvf submission.tar.gz main.py deck.csv src models
-kaggle competitions submit -c pokemon-tcg-ai-battle -f submission.tar.gz -m "Phase 3 Curriculum Weights"
-```
-> **Note on Strategy:** The Kaggle API enforces a strict daily limit of 5 submissions. We strictly validate the agent's win rate on local hybrid matchups before burning a daily submission slot.
+Rather than attempting to build a generalized bot that can play any deck (which historically fails due to combinatorial explosion and complex card interactions), our strategic focus is:
+1. **Deck Simplicity:** Pilot a simple, robust, high-consistency deck (e.g., Mono-Water Basic, Snorlax Control) that minimizes dead hands.
+2. **Crash-Proof Safety:** The engine drops any submission that raises an exception. We utilize aggressive `try/except` fallbacks that automatically inspect the `cabt` engine's `minCount` and return legal dummy actions to survive edge-cases.
+3. **Pure-NumPy Inference:** The Kaggle runtime has a strict 600s time budget. We train via PyTorch (CUDA) locally but export weights to `.npz` for ultra-fast, zero-overhead pure-NumPy inference on the Kaggle servers.
 
 ---
 
 ## Phase Status and Ladder Results
 
-| Phase | Status | Real Ladder Score | Notes |
-|---|---|---|---|
-| **Phase 0** — Deck Selection | Complete | — | Mono-Water: 4x Squirtle, 4x Staryu, 4x Poliwag, 48x Water Energy |
-| **Phase 1** — Rule-Based Agent | Complete | **170.1** | Heuristic: Attack > Evolve > Play > Attach > End |
-| **Phase 2** — RL Pipeline | Deployed | **303.6** | PPO + Pure-NumPy inference. Current active deployment. |
-| **Phase 4** — Bellibolt Heuristic | Complete | **157.6** | Rule-based agent with Iono's Bellibolt deck. |
-| **Phase 9** — RL Agent (BC Init) | Complete | **282.3** | PPO initialized from Behavioral Cloning on Lopunny deck. |
-| **Current** — Meta Opponent Curriculum | In Progress | Target: **>303.6** | PPO trained against all meta decks to generalize strategy. |
+We follow a strict **phase-gated deployment cycle**: a new agent iteration is only promoted to the main submission file if it empirically out-scores the previous version on the *real* Kaggle ladder.
 
-Full submission history → [`eval/ladder_log.md`](eval/ladder_log.md)
+| Phase | Status | Real Ladder Score | Core Contribution |
+|---|---|---|---|
+| **Phase 0** | Complete | — | Deck Mine: Identified optimal, consistent 60-card decks. |
+| **Phase 1** | Complete | **170.1** | Naive Heuristic Baseline (Attack > Evolve > Attach). |
+| **Phase 2** | Complete | **303.6** | PPO + Pure-NumPy inference deployed. Current PB! |
+| **Phase 9** | Complete | **282.3** | Behavioral Cloning Initialization on Snorlax/Lopunny deck. |
+| **Current** | In Progress | Target: **>303.6** | **Phase 3 Scaling:** Meta Opponent Curriculum & 100k+ parallel episode training. |
+
+Full submission history and local benchmarks → [`eval/ladder_log.md`](eval/ladder_log.md)
+
+---
+
+## Training Methodology & Local Reproduction
+
+To reproduce our local training environment (using our custom `cabt` C++ Gymnasium wrapper):
+
+### 1. Environment & Dataset Setup
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+
+# Download the EN_Card_Data.csv for True Sight Heuristics
+python -c "import kagglehub; kagglehub.competition_download('pokemon-tcg-ai-battle-challenge-strategy')"
+```
+Place `EN_Card_Data.csv` directly in the `data/` folder.
+
+### 2. Training the RL Model (100k+ Curriculum)
+
+```bash
+.venv\Scripts\python src\train\train_ppo.py
+```
+This spawns 9 asynchronous parallel workers and aggressively updates model weights via PyTorch. Weights are actively exported to `models/ppo_weights.npz` every few thousand episodes.
+
+### 3. Kaggle Submission Packaging
+
+```bash
+tar -czvf submission.tar.gz main.py deck.csv src models data
+kaggle competitions submit -c pokemon-tcg-ai-battle -f submission.tar.gz -m "Phase 3 Curriculum Weights"
+```
 
 ---
 
@@ -182,11 +122,11 @@ graph TD
 ```
 
 - **Self-Play Pool:** Prevents strategy collapse. The agent learns the fundamental mechanics (shadowboxing) by playing against past checkpoints of itself.
-- **Generic Meta Agent:** The `rule_based_generic.py` agent acts as the ultimate gatekeeper, utilizing "True Sight" (database lookups) to pilot 24 highly-optimized, tier-1 meta decks flawlessly.
+- **Generic Meta Agent:** The `rule_based_generic.py` acts as the ultimate gatekeeper, utilizing "True Sight" (database lookups) to pilot 24 highly-optimized, tier-1 meta decks flawlessly.
 
 ### 2. Inference Pipeline (Kaggle Deployment)
 
-> **Environment Context**: The `cabt` environment is built `FROM gcr.io/kaggle-images/python:v163` — the full Kaggle Python image. **PyTorch IS available** at the Kaggle runtime. However, we utilize **pure NumPy inference** to ensure an ultra-fast cold-start and to avoid memory fragmentation over the 10-minute game limit.
+> **Environment Context**: The `cabt` environment is built `FROM gcr.io/kaggle-images/python:v163` — the full Kaggle Python image. While PyTorch is technically available, we utilize **pure NumPy inference** to ensure an ultra-fast cold-start and to avoid memory fragmentation over the 10-minute maximum game limit.
 
 ```mermaid
 graph LR
@@ -197,24 +137,25 @@ graph LR
     Policy --> Mask[action_mask.py<br/>Zero-out illegals]
     
     Mask --> Output[Kaggle Action Index]
-    RBG -.->|If NN fails| Output
+    RBG -.->|If NN fails/Turn 0| Output
     
     style Policy fill:#3776AB,stroke:#333,color:#fff
     style RBG fill:#22C55E,stroke:#333,color:#fff
 ```
 
-### RL Pipeline Components
+### Core Pipeline Components
 
-| Component | File | Description |
+| Component | Target File | Purpose in Competition |
 |---|---|---|
-| Environment | `src/env/fast_sim.py` | Gymnasium wrapper; RL agent is P0, rule-based auto-drives P1 |
-| State Encoder | `src/agent/state_encoder.py` | 24-dim: 4 global + 10 self + 10 opponent |
-| Action Mask | `src/agent/action_mask.py` | NumPy masked softmax over variable-length legal moves |
-| Reward | `src/env/reward.py` | Shaped: win/loss terminal + prize delta per step |
-| Actor-Critic | `src/train/train_ppo.py` | MLP(24→128→128→150), 1-step TD PPO |
-| Policy (Kaggle) | `src/agent/policy.py` | Pure NumPy forward pass; loads `ppo_weights.npz` |
+| **Entrypoint** | `main.py` | Thin wrapper loading `policy_agent` and handling Turn 0 deck submissions. |
+| **Heuristics** | `src/agent/rule_based_generic.py` | Our crash-proof universal opponent. Provides the 50% meta-training baseline. |
+| **RL Policy** | `src/agent/policy.py` | The actual NumPy logic deployed to Kaggle. Evaluates the Actor head. |
+| **State Tracking** | `src/agent/opponent_model.py` | Tracks hidden information (opponent hand/discard pile) probabilistically. |
+| **Environment** | `src/env/fast_sim.py` | C++ interop. Wraps the engine and logs crashes instantly during training. |
 
-### Known Limitations & Phase 3 Roadmap
+---
+
+## Known Limitations & Phase 3 Roadmap
 
 | Limitation | Phase 3 Solution |
 |---|---|
@@ -223,19 +164,7 @@ graph LR
 | No self-play | **Complete:** Hybrid Checkpoint pool + Meta Decks |
 | Weak mono-basic deck | **Complete:** Snorlax/Lopunny control deck |
 
----
-
-## Key Development Rules
-
-- **Execution Safety** — The agent must never crash. It must always return a legal fallback action. Crashes result in an instant loss.
-- **Turn 0 Initialization** — Turn 0 must always return the deck configuration (60 card IDs). All subsequent turns return action indices.
-- **Deployment Protocol** — Never promote a Phase N+1 agent to `main.py` unless it empirically beats the previous agent's real ladder score.
-- **Ladder Authority** — Local simulations differ from the real ladder. Local results are sanity checks only; the real ladder is the sole source of ground truth.
-
----
-
 ## References
-
 - [cabt Engine Documentation](https://matsuoinstitute.github.io/cabt/)
 - [Kaggle Competition Page](https://www.kaggle.com/competitions/pokemon-tcg-ai-battle)
 - [Ladder Log](eval/ladder_log.md) · [AGENTS.md](AGENTS.md) · [Deck Rationale](decks/deck_rationale.md)
