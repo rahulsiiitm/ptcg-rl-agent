@@ -81,7 +81,7 @@ class ActorCritic(nn.Module):
 
 # ─── Worker process ───────────────────────────────────────────────────────────
 
-def env_worker(worker_id: int, conn: mp.connection.Connection, all_decks: list):
+def env_worker(_, conn: mp.connection.Connection, all_decks: list):
     """
     Each worker owns one environment. Protocol:
       - Receives action list from main process
@@ -95,8 +95,18 @@ def env_worker(worker_id: int, conn: mp.connection.Connection, all_decks: list):
     import random
 
     pool = SelfPlayPool()
-    env = FastPTCGEnv(rl_deck=SNORLAX_DECK, opp_deck=random.choice(all_decks))
-    env.set_opponent_agent(pool.sample_opponent())
+    
+    # Lazy import to avoid circular dependencies in workers
+    from src.agent.rule_based_generic import rule_based_generic_agent
+    
+    initial_opp_deck = random.choice(all_decks)
+    env = FastPTCGEnv(rl_deck=SNORLAX_DECK, opp_deck=initial_opp_deck)
+    
+    if initial_opp_deck == SNORLAX_DECK:
+        env.set_opponent_agent(pool.sample_opponent())
+    else:
+        env.set_opponent_agent(rule_based_generic_agent)
+        
     obs, _ = env.reset()
     conn.send(('obs', obs))
 
@@ -105,7 +115,12 @@ def env_worker(worker_id: int, conn: mp.connection.Connection, all_decks: list):
         if isinstance(msg, tuple) and msg[0] == 'reset':
             env.set_rl_deck(msg[1])
             env.set_opponent_deck(msg[2])
-            env.set_opponent_agent(pool.sample_opponent())
+            
+            if msg[2] == SNORLAX_DECK:
+                env.set_opponent_agent(pool.sample_opponent())
+            else:
+                env.set_opponent_agent(rule_based_generic_agent)
+                
             obs, _ = env.reset()
             conn.send(('obs', obs))
         elif msg == 'close':
@@ -301,20 +316,27 @@ def train():
                             total_wins += 1
                             deck_stats[deck_idx]['wins'] += 1
                         
-                        # Prioritized sampling: lower win rate = higher probability
-                        probs = []
-                        for d_idx in range(len(ALL_DECKS)):
-                            st = deck_stats[d_idx]
-                            wr = st['wins'] / max(1, st['games'])
-                            probs.append(1.0 - wr + 0.1) # Add 0.1 for exploration
-                        probs = np.array(probs)
-                        probs /= probs.sum()
-                        
-                        sampled_opp_idx = np.random.choice(len(ALL_DECKS), p=probs)
-                        current_opp_deck_idx[i] = sampled_opp_idx
-                        
-                        # Tell worker to reset with specific decks
-                        parent_conns[i].send(('reset', SNORLAX_DECK, ALL_DECKS[sampled_opp_idx]))
+                        # 50% Mirror Match, 50% Meta Match
+                        if np.random.rand() < 0.5:
+                            # Mirror Match
+                            parent_conns[i].send(('reset', SNORLAX_DECK, SNORLAX_DECK))
+                        else:
+                            # Meta Match
+                            # Prioritized sampling: lower win rate = higher probability
+                            probs = []
+                            for d_idx in range(len(ALL_DECKS)):
+                                st = deck_stats[d_idx]
+                                wr = st['wins'] / max(1, st['games'])
+                                probs.append(1.0 - wr + 0.1) # Add 0.1 for exploration
+                            probs = np.array(probs)
+                            probs /= probs.sum()
+                            
+                            sampled_opp_idx = np.random.choice(len(ALL_DECKS), p=probs)
+                            current_opp_deck_idx[i] = sampled_opp_idx
+                            
+                            # Tell worker to reset with specific decks
+                            parent_conns[i].send(('reset', SNORLAX_DECK, ALL_DECKS[sampled_opp_idx]))
+                            
                         tag, new_obs = parent_conns[i].recv()
                         obs_list[i] = new_obs
 

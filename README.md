@@ -57,11 +57,12 @@ ptcg-rl-agent/
 ├── deck.csv                 # 60-card deck submitted with the agent
 ├── src/
 │   ├── agent/
-│   │   ├── rule_based.py       # Phase 1: Heuristic rule-based agent
-│   │   ├── policy.py           # Phase 2: Pure-NumPy RL policy inference
-│   │   ├── state_encoder.py    # Encodes cabt JSON obs → flat float32 vector
-│   │   ├── action_mask.py      # Masks illegal actions from logits (NumPy)
-│   │   └── opponent_model.py   # Probabilistic opponent hand/deck tracker
+│   │   ├── rule_based.py         # Phase 1: Heuristic rule-based agent
+│   │   ├── rule_based_generic.py # Universal "True Sight" opponent for all 24 meta decks
+│   │   ├── policy.py             # Phase 2: Pure-NumPy RL policy inference
+│   │   ├── state_encoder.py      # Encodes cabt JSON obs → flat float32 vector
+│   │   ├── action_mask.py        # Masks illegal actions from logits (NumPy)
+│   │   └── opponent_model.py     # Probabilistic opponent hand/deck tracker
 │   ├── env/
 │   │   ├── fast_sim.py         # Gymnasium wrapper around the C++ cg engine
 │   │   └── reward.py           # Shaped reward (win/loss + prizes + KOs)

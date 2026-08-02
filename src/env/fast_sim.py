@@ -91,6 +91,11 @@ class FastPTCGEnv(gym.Env):
                 opp_action = self.opponent_agent(obs)
                 obs = battle_select(opp_action)
             except Exception as e:
+                import traceback
                 print(f"Opponent agent crashed: {e}")
+                print(f"Opp_action that caused crash: {opp_action}")
+                print(f"Available options: {obs.get('select', {}).get('option', [])}")
+                print(f"Select ctx: {obs.get('select', {})}")
+                print(f"Traceback:\n{traceback.format_exc()}")
                 obs["current"]["result"] = 0 
                 return obs, True
