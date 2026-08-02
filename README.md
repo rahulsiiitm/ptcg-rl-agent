@@ -50,7 +50,7 @@ Rather than attempting to build a generalized bot that can play any deck (which 
 </ol>
 </td>
 <td valign="top" width="25%" align="center">
-<img src="https://assets.pokemon.com/assets/cms2/img/pokedex/full/658.png" width="200" alt="Greninja">
+<img src="https://play.pokemonshowdown.com/sprites/ani/greninja.gif" width="100" alt="Greninja">
 </td>
 </tr>
 </table>
@@ -59,6 +59,9 @@ Rather than attempting to build a generalized bot that can play any deck (which 
 
 ## Phase Status and Ladder Results
 
+<table>
+<tr>
+<td valign="top" width="80%">
 We follow a strict **phase-gated deployment cycle**: a new agent iteration is only promoted to the main submission file if it empirically out-scores the previous version on the *real* Kaggle ladder.
 
 | Phase | Status | Real Ladder Score | Core Contribution |
@@ -70,6 +73,12 @@ We follow a strict **phase-gated deployment cycle**: a new agent iteration is on
 | **Current** | In Progress | Target: **>303.6** | **Phase 3 Scaling:** Meta Opponent Curriculum & 100k+ parallel episode training. |
 
 Full submission history and local benchmarks → [`eval/ladder_log.md`](eval/ladder_log.md)
+</td>
+<td valign="top" width="20%" align="center">
+<img src="https://play.pokemonshowdown.com/sprites/ani/snorlax.gif" width="120" alt="Snorlax">
+</td>
+</tr>
+</table>
 
 ---
 
@@ -110,7 +119,7 @@ kaggle competitions submit -c pokemon-tcg-ai-battle -f submission.tar.gz -m "Pha
 <table>
 <tr>
 <td valign="center" width="25%" align="center">
-<img src="https://assets.pokemon.com/assets/cms2/img/pokedex/full/025.png" width="200" alt="Pikachu">
+<img src="https://play.pokemonshowdown.com/sprites/ani/pikachu.gif" width="100" alt="Pikachu">
 </td>
 <td valign="center" width="75%">
 
@@ -178,6 +187,13 @@ graph LR
 
 ## Model Deep Dive & Approach
 
+<table>
+<tr>
+<td valign="top" width="20%" align="center">
+<img src="https://play.pokemonshowdown.com/sprites/ani/mewtwo.gif" width="100" alt="Mewtwo">
+</td>
+<td valign="top" width="80%">
+
 ### 1. State Encoding (`state_encoder.py`)
 The `cabt` engine provides observations as deeply nested, variable-length JSON objects containing hidden strings and raw IDs. Our state encoder squashes this imperfect-information tree into a **24-dimensional dense Float32 vector** suitable for an MLP:
 
@@ -186,6 +202,10 @@ The `cabt` engine provides observations as deeply nested, variable-length JSON o
 - **Opponent State (10 dims):** Visible active HP, estimated hand size (via `opponent_model.py`), visible bench size, discard pile tracking.
 
 *Note: The 24-dim state is extremely compressed to prevent overfitting to specific deck IDs, forcing the model to learn abstract concepts like "board advantage" rather than "use card X."*
+
+</td>
+</tr>
+</table>
 
 ### 2. Reward Shaping (`reward.py`)
 To prevent sparse-reward stagnation (since Kaggle PTCG games can last 100+ steps), we use dense, shaped rewards:
@@ -208,12 +228,23 @@ The logits are then passed through `action_mask.py` which forcefully sets `logit
 
 ## Known Limitations & Phase 3 Roadmap
 
+<table>
+<tr>
+<td valign="top" width="80%">
+
 | Limitation | Phase 3 Solution |
 |---|---|
 | 24-dim state (no HP, type, moves) | Expand to ~128-dim encoder |
 | Only 50 training episodes | **Complete:** 100k+ episodes with 9-worker parallel envs |
 | No self-play | **Complete:** Hybrid Checkpoint pool + Meta Decks |
 | Weak mono-basic deck | **Complete:** Snorlax/Lopunny control deck |
+
+</td>
+<td valign="top" width="20%" align="center">
+<img src="https://play.pokemonshowdown.com/sprites/ani/lopunny.gif" width="100" alt="Lopunny">
+</td>
+</tr>
+</table>
 
 ## References
 - [cabt Engine Documentation](https://matsuoinstitute.github.io/cabt/)
