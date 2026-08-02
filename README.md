@@ -1,8 +1,11 @@
-<h1 align="center"><img width="1024" height="384" alt="pokemongames-banner-1024x384" src="https://github.com/user-attachments/assets/7be6b89f-fd42-49a8-af15-7140c7d72c22" />
-PTCG AI Battle Agent</h1>
+<h1 align="center">PTCG AI Battle Agent</h1>
 
 <p align="center">
   <strong>Reinforcement Learning + Heuristic Agent for the Kaggle Pokémon TCG AI Battle Challenge</strong>
+</p>
+
+<p align="center">
+  <img width="1024" height="384" alt="pokemongames-banner-1024x384" src="https://github.com/user-attachments/assets/7be6b89f-fd42-49a8-af15-7140c7d72c22" />
 </p>
 
 <p align="center">
@@ -83,9 +86,13 @@ ptcg-rl-agent/
 
 ---
 
-## Setup and Installation
+## Training Methodology & Local Reproduction
 
-### 1. Virtual Environment Initialization
+This repository contains the training and inference pipeline used to build our competition submission. It is structured as an experimental research project rather than a generalized library.
+
+### 1. Environment Setup
+
+To reproduce our local training environment (which uses a custom `cabt` C++ Gym wrapper):
 
 ```bash
 python -m venv .venv
@@ -95,42 +102,40 @@ pip install -r requirements.txt
 
 ### 2. Dataset Acquisition
 
-Authenticate with Kaggle (`~/.kaggle/kaggle.json`), then download the card dataset:
+The agent requires the official Kaggle competition card dataset to perform "True Sight" heuristics:
 
 ```bash
 python -c "import kagglehub; kagglehub.competition_download('pokemon-tcg-ai-battle-challenge-strategy')"
 ```
-
 Place `EN_Card_Data.csv` in the `data/` folder.
 
 ---
 
-## Usage
+## Agent Training & Verification
 
-### Run a Local Test Match
+### Training the PPO Model
 
-```bash
-.venv\Scripts\python tests\test_agent.py
-```
-
-Executes a full match between `policy_agent` (Player 0) and `rule_based_agent` (Player 1) using the local C++ simulation engine.
-
-### Train the PPO Model
+The core RL policy is trained using a highly parallelized PyTorch PPO loop:
 
 ```bash
 .venv\Scripts\python src\train\train_ppo.py
 ```
+This spawns multiple parallel environments and actively updates the model weights against a hybrid pool of past-self checkpoints and 24 hand-crafted meta decks. Weights are automatically exported to `models/ppo_weights.npz` to bypass PyTorch import overhead on Kaggle.
 
-Initiates the PyTorch training loop on CUDA. Saves weights to `models/ppo_baseline.pth` and `models/ppo_weights.npz`.
+### Local Simulation Sanity Check
 
-### Build and Submit to Kaggle
+```bash
+.venv\Scripts\python tests\test_agent.py
+```
+Runs a local match to verify that the NumPy forward pass identically matches the PyTorch outputs and that the `cabt` engine does not throw illegal action exceptions.
+
+### Kaggle Submission Packaging
 
 ```bash
 tar -czvf submission.tar.gz main.py deck.csv src models
-kaggle competitions submit -c pokemon-tcg-ai-battle -f submission.tar.gz -m "your message"
+kaggle competitions submit -c pokemon-tcg-ai-battle -f submission.tar.gz -m "Phase 3 Curriculum Weights"
 ```
-
-> **Note on Rate Limits:** The Kaggle API enforces a strict daily limit of 5 submissions. Always validate the agent locally before submission.
+> **Note on Strategy:** The Kaggle API enforces a strict daily limit of 5 submissions. We strictly validate the agent's win rate on local hybrid matchups before burning a daily submission slot.
 
 ---
 
