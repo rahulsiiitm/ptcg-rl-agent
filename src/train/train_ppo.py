@@ -25,13 +25,13 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from src.agent.state_encoder import ObservationEncoder
 from src.agent.action_mask import get_action_mask, MAX_ACTION_SPACE
-from src.agent.rule_based_lopunny import rule_based_agent as expert_agent
+from src.agent.rule_based_lopunny import agent as expert_agent
 
 # ─── Hyperparameters ──────────────────────────────────────────────────────────
 STATE_DIM       = ObservationEncoder.STATE_DIM   # 2632 (658 single-frame * 4 history)
 ACTION_DIM      = MAX_ACTION_SPACE               # 150
 HIDDEN_DIM      = 256
-N_WORKERS       = 9          # parallel envs (tune to your CPU core count)
+N_WORKERS       = 10          # parallel envs (tune to your CPU core count)
 EPISODES        = 100_000
 MAX_STEPS       = 500        # max steps per episode
 GAMMA           = 0.99

@@ -190,7 +190,7 @@ def _handle_card_select(obs_dict: dict, options: list) -> list[int]:
         return [0]
     return []
 
-def rule_based_agent(obs_dict: dict) -> list[int]:
+def agent(obs_dict: dict) -> list[int]:
     try:
         step = obs_dict.get("step", 1) if obs_dict else 0
         if step == 0:

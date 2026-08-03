@@ -4,6 +4,8 @@ def _compute_board_utility(player_dict: dict) -> float:
     bench = player_dict.get("bench", [])
     
     for pkmn in active + bench:
+        if pkmn is None:
+            continue
         max_hp = pkmn.get("maxHp", 0)
         hp = pkmn.get("hp", 0)
         u += (max_hp / 100.0)
@@ -13,7 +15,7 @@ def _compute_board_utility(player_dict: dict) -> float:
         if isinstance(energies, list):
             u += 0.5 * len(energies)
             
-    if active:
+    if active and active[0] is not None:
         a = active[0]
         if a.get("hp", 100) <= 50:
             u -= 2.0
