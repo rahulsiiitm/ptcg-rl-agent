@@ -87,6 +87,7 @@ class FastPTCGEnv(gym.Env):
             if your_index == 0:
                 return obs, False
                 
+            opp_action = None  # initialise before try so except can always reference it
             try:
                 opp_action = self.opponent_agent(obs)
                 obs = battle_select(opp_action)

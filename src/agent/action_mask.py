@@ -22,23 +22,31 @@ def get_action_mask(obs_dict: dict) -> np.ndarray:
     if num_options > 0:
         mask[:num_options] = True
         
-        # Heuristic Masking: Prevent skipping attacks.
-        # If the agent can ATTACK (type 13), mask out PASS_TURN (type 14).
-        has_attack = False
-        pass_turn_idx = -1
-        
-        for i, opt in enumerate(options):
-            if isinstance(opt, dict):
-                opt_type = opt.get("type")
-                if opt_type == 13: # ATTACK
-                    has_attack = True
-                elif opt_type == 14: # END TURN / PASS
-                    pass_turn_idx = i
-                    
-        if has_attack and pass_turn_idx != -1:
-            mask[pass_turn_idx] = False
+        # Heuristic Masking has been removed to allow the agent to learn to pass for stall.
             
     return mask
+
+def apply_heuristic_overrides(masked_logits: np.ndarray, obs_dict: dict, options: list) -> np.ndarray:
+    if len(options) == 1:
+        masked_logits[0] = 1e9
+        return masked_logits
+        
+    select_data = obs_dict.get("select", {})
+    if select_data.get("type", 0) == 0 and select_data.get("context", 0) == 0:
+        for i, opt in enumerate(options):
+            if not isinstance(opt, dict):
+                continue
+            opt_type = opt.get("type")
+            if opt_type == 10: # Ability (Dudunsparce)
+                masked_logits[i] += 15.0
+            elif opt_type == 12: # Retreat (Loss shield)
+                me = obs_dict.get("current", {}).get("players", [{}])[0]
+                active = me.get("active", [])
+                if active and active[0].get("hp", 100) <= 50:
+                    masked_logits[i] += 10.0
+            elif opt_type == 13: # Attack (Progress/Win)
+                masked_logits[i] += 5.0
+    return masked_logits
 
 def sample_valid_action(logits: np.ndarray, obs_dict: dict) -> list[int]:
     """
@@ -61,6 +69,8 @@ def sample_valid_action(logits: np.ndarray, obs_dict: dict) -> list[int]:
     
     masked_logits = np.copy(logits)
     masked_logits[~mask] = -1e9
+    
+    masked_logits = apply_heuristic_overrides(masked_logits, obs_dict, options)
     
     # Softmax
     e_x = np.exp(masked_logits - np.max(masked_logits))

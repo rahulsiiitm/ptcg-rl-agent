@@ -9,7 +9,7 @@ Architecture:
 """
 
 import os
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True" # Not supported on Windows
 import sys
 import torch
 import torch.nn as nn
@@ -28,21 +28,21 @@ from src.agent.action_mask import get_action_mask, MAX_ACTION_SPACE
 from src.agent.rule_based_lopunny import rule_based_agent as expert_agent
 
 # ─── Hyperparameters ──────────────────────────────────────────────────────────
-STATE_DIM       = ObservationEncoder.STATE_DIM   # 167
+STATE_DIM       = ObservationEncoder.STATE_DIM   # 2632 (658 single-frame * 4 history)
 ACTION_DIM      = MAX_ACTION_SPACE               # 150
 HIDDEN_DIM      = 256
 N_WORKERS       = 9          # parallel envs (tune to your CPU core count)
 EPISODES        = 100_000
-MAX_STEPS       = 300        # max steps per episode
+MAX_STEPS       = 500        # max steps per episode
 GAMMA           = 0.99
 CLIP_RATIO      = 0.2
-LR              = 3e-4
-ENTROPY_COEF    = 0.01       # encourage exploration
-CHECKPOINT_EVERY = 5_000     # save to pool every N episodes
+LR              = 1e-4
+ENTROPY_COEF    = 0.005      # encourage exploration
+CHECKPOINT_EVERY = 2_500     # save to pool every N episodes
 POOL_DIR        = "models/pool"
 
-IMITATION_LAMBDA = 0.8
-IMITATION_EPISODES = 20_000
+IMITATION_LAMBDA = 0.0
+IMITATION_EPISODES = 0
 
 # Load deck directly from deck.csv to ensure inference exactly matches training
 def _load_deck_from_csv(path="deck.csv"):
@@ -168,12 +168,23 @@ def train():
     import glob
     checkpoints = glob.glob("models/pool/checkpoint_*.pth")
     if checkpoints:
-        # Sort by episode number
-        checkpoints.sort(key=lambda x: int(os.path.basename(x).split('_')[1].split('.')[0]), reverse=True)
-        latest_ckpt = checkpoints[0]
-        START_EP = int(os.path.basename(latest_ckpt).split('_')[1].split('.')[0])
-        model.load_state_dict(torch.load(latest_ckpt, map_location=device, weights_only=True), strict=False)
-        print(f"Resuming from {latest_ckpt} checkpoint at episode {START_EP}!")
+        # Sort by episode number; skip any file whose name isn't checkpoint_N.pth
+        def _ckpt_ep(path):
+            try:
+                return int(os.path.basename(path).split('_')[1].split('.')[0])
+            except (IndexError, ValueError):
+                return -1
+        checkpoints = [c for c in checkpoints if _ckpt_ep(c) >= 0]
+        checkpoints.sort(key=_ckpt_ep, reverse=True)
+        
+        if checkpoints:
+            latest_ckpt = checkpoints[0]
+            START_EP = int(os.path.basename(latest_ckpt).split('_')[1].split('.')[0])
+            model.load_state_dict(torch.load(latest_ckpt, map_location=device, weights_only=True), strict=False)
+            print(f"Resuming from {latest_ckpt} checkpoint at episode {START_EP}!")
+        elif os.path.exists("models/ppo_latest.pth"):
+            model.load_state_dict(torch.load("models/ppo_latest.pth", map_location=device, weights_only=True), strict=False)
+            print("Resuming from existing models/ppo_latest.pth checkpoint (pool was empty/invalid)!")
     elif os.path.exists("models/ppo_latest.pth"):
         model.load_state_dict(torch.load("models/ppo_latest.pth", map_location=device, weights_only=True), strict=False)
         print("Resuming from existing models/ppo_latest.pth checkpoint!")
@@ -198,7 +209,7 @@ def train():
         child_conns.append(child_conn)
 
     # PPO Hyperparams
-    STEPS_PER_ROLLOUT = 128
+    STEPS_PER_ROLLOUT = 192
     PPO_EPOCHS = 4
     MINIBATCH_SIZE = 256
     GAE_LAMBDA = 0.95
@@ -234,8 +245,8 @@ def train():
                 masks = []
                 expert_actions = []
                 for i, obs in enumerate(obs_list):
-                    expert_a = expert_agent(obs)
-                    expert_actions.append(expert_a[0] if expert_a else 0)
+                    # Imitation is disabled, save CPU by not calling expert
+                    expert_actions.append(0)
                     
                     mask = get_action_mask(obs)
                     masks.append(mask)
@@ -244,8 +255,9 @@ def train():
                     masked[~mask_t] = -1e9
                     probs = torch.softmax(masked, dim=-1)
 
-                    if probs.sum() < 1e-8 or torch.isnan(probs).any():
-                        action = [0]
+                    if probs.sum() < 1e-8 or torch.isnan(probs).any() or mask_t.sum() == 0:
+                        # No valid actions — send empty list; engine will handle it
+                        action = []
                         log_prob = torch.tensor(0.0, device=device)
                     else:
                         select_data = obs.get("select", {})
@@ -299,17 +311,17 @@ def train():
                 batch_log_probs.append(torch.stack(log_probs))
                 batch_rewards.append(torch.tensor(rewards, dtype=torch.float32).to(device))
                 batch_dones.append(torch.tensor(dones, dtype=torch.float32).to(device))
-                batch_values.append(values.squeeze(-1))
+                batch_values.append(values.squeeze(-1).detach())  # detach: no grad needed for GAE targets
                 batch_masks.append(torch.tensor(np.stack(masks), dtype=torch.bool).to(device))
                 batch_expert_actions.append(torch.tensor(expert_actions, dtype=torch.long).to(device))
                 
-                obs_list = new_obs_list
-                
-                # Bookkeeping
+                # Bookkeeping — read terminal result from new_obs_list BEFORE swapping obs_list
+                # so we read the final game state, not the first obs of the next game.
                 for i, done in enumerate(dones):
                     if done:
                         ep += 1
-                        result = obs_list[i].get('current', {})
+                        terminal_obs = new_obs_list[i]  # FIX: use new_obs_list, not obs_list
+                        result = terminal_obs.get('current', {})
                         r = result.get('result', -1) if result else -1
                         
                         deck_idx = current_opp_deck_idx[i]
@@ -318,40 +330,45 @@ def train():
                             total_wins += 1
                             deck_stats[deck_idx]['wins'] += 1
                         
-                        # 50% Mirror Match, 50% Meta Match
-                        if np.random.rand() < 0.5:
+                        # 30% Mirror Match, 70% Meta Match
+                        if np.random.rand() < 0.3:
                             # Mirror Match
                             parent_conns[i].send(('reset', SNORLAX_DECK, SNORLAX_DECK))
                         else:
                             # Meta Match
                             # Prioritized sampling: lower win rate = higher probability
-                            probs = []
+                            deck_probs = []
                             for d_idx in range(len(ALL_DECKS)):
                                 st = deck_stats[d_idx]
                                 wr = st['wins'] / max(1, st['games'])
-                                probs.append(1.0 - wr + 0.1) # Add 0.1 for exploration
-                            probs = np.array(probs)
-                            probs /= probs.sum()
+                                deck_probs.append(1.0 - wr + 0.1) # Add 0.1 for exploration
+                            deck_probs = np.array(deck_probs)
+                            deck_probs /= deck_probs.sum()
                             
-                            sampled_opp_idx = np.random.choice(len(ALL_DECKS), p=probs)
+                            sampled_opp_idx = np.random.choice(len(ALL_DECKS), p=deck_probs)
                             current_opp_deck_idx[i] = sampled_opp_idx
                             
                             # Tell worker to reset with specific decks
                             parent_conns[i].send(('reset', SNORLAX_DECK, ALL_DECKS[sampled_opp_idx]))
                             
                         tag, new_obs = parent_conns[i].recv()
-                        obs_list[i] = new_obs
+                        new_obs_list[i] = new_obs  # FIX: update new_obs_list, not obs_list
 
                         if ep % 50 == 0:
-                            torch.cuda.empty_cache()
+                            if device.type == 'cuda':
+                                torch.cuda.empty_cache()
                             win_rate = total_wins / max(1, ep - START_EP)
                             dt = time.time() - t0
                             print(f"Ep: {ep} | WR: {win_rate:.2f} | Time: {dt:.1f}s", flush=True)
                         
-                        if ep % CHECKPOINT_EVERY == 0:
+                        # Skip ep==0 to avoid saving an untrained checkpoint as a self-play opponent
+                        if ep % CHECKPOINT_EVERY == 0 and ep > 0:
                             ckpt_path = os.path.join(POOL_DIR, f"checkpoint_{ep}.pth")
                             torch.save(model.state_dict(), ckpt_path)
                             print(f"Saved checkpoint to {ckpt_path}", flush=True)
+
+                # Advance obs_list to new observations (including post-reset obs for done envs)
+                obs_list = new_obs_list
 
             # ── GAE Advantage Computation ──
             # Get next value for the very last step
@@ -369,7 +386,7 @@ def train():
                     next_non_terminal = 1.0 - batch_dones[t]
                     next_val = next_values
                 else:
-                    next_non_terminal = 1.0 - batch_dones[t]
+                    next_non_terminal = 1.0 - batch_dones[t + 1]  # FIX: use t+1, not t
                     next_val = batch_values[t + 1]
                 
                 delta = batch_rewards[t] + GAMMA * next_val * next_non_terminal - batch_values[t]
@@ -381,7 +398,9 @@ def train():
             b_states = torch.cat(batch_states)
             b_log_probs = torch.cat(batch_log_probs)
             b_returns = torch.cat(returns)
-            b_advantages = b_returns - torch.cat(batch_values)
+            # FIX: use GAE advantages directly (returns - values), not a naive recompute.
+            # The GAE backward loop already built `returns` with lambda weighting baked in.
+            b_advantages = (b_returns - torch.cat(batch_values)).detach()
             b_masks = torch.cat(batch_masks)
             b_expert_actions = torch.cat(batch_expert_actions)
             
@@ -398,7 +417,10 @@ def train():
             dataset_size = len(b_states)
             indices = np.arange(dataset_size)
             
-            c2_imitation = max(0.0, IMITATION_LAMBDA * (1.0 - ep / IMITATION_EPISODES))
+            if IMITATION_EPISODES > 0:
+                c2_imitation = max(0.0, IMITATION_LAMBDA * (1.0 - ep / max(1, IMITATION_EPISODES)))
+            else:
+                c2_imitation = 0.0
             
             for _ in range(PPO_EPOCHS):
                 np.random.shuffle(indices)
@@ -418,12 +440,16 @@ def train():
                     
                     # Recompute log probs for actions
                     mb_log_probs = []
+                    neg_inf_fill = torch.full(logits[0].shape, -1e9, device=device)  # allocate once
                     for k, idx in enumerate(mb_idx):
                         mask_t = mb_masks[k]
                         action_list = flat_actions[idx]
                         
-                        if len(action_list) == 1:
-                            masked = torch.where(mask_t, logits[k], torch.tensor(-1e9, device=device))
+                        if len(action_list) == 0:
+                            # No action was taken (empty-mask fallback) — contribute zero log-prob
+                            mb_log_probs.append(torch.tensor(0.0, device=device))
+                        elif len(action_list) == 1:
+                            masked = torch.where(mask_t, logits[k], neg_inf_fill)
                             dist = torch.distributions.Categorical(logits=masked)
                             idx_t = torch.tensor(action_list[0], device=device)
                             mb_log_probs.append(dist.log_prob(idx_t))
@@ -431,7 +457,7 @@ def train():
                             log_prob_sum = torch.tensor(0.0, device=device)
                             curr_mask = mask_t.clone()
                             for a in action_list:
-                                masked = torch.where(curr_mask, logits[k], torch.tensor(-1e9, device=device))
+                                masked = torch.where(curr_mask, logits[k], neg_inf_fill)
                                 dist = torch.distributions.Categorical(logits=masked)
                                 idx_t = torch.tensor(a, device=device)
                                 log_prob_sum = log_prob_sum + dist.log_prob(idx_t)
@@ -439,6 +465,8 @@ def train():
                                 curr_mask[a] = False
                             mb_log_probs.append(log_prob_sum)
                             
+                    if not mb_log_probs:
+                        continue  # skip degenerate minibatch with no actions
                     mb_log_probs = torch.stack(mb_log_probs)
                     
                     # Policy Loss (Clipped Surrogate Objective)
@@ -453,18 +481,28 @@ def train():
                     critic_loss = 0.5 * (mb_returns - values).pow(2).mean()
                     
                     # Entropy Bonus
-                    masked_logits = torch.where(mb_masks, logits, torch.tensor(-1e9, device=device))
+                    neg_inf = torch.full_like(logits, -1e9)  # reuse scalar across all ops below
+                    masked_logits = torch.where(mb_masks, logits, neg_inf)
                     probs = torch.softmax(masked_logits, dim=-1)
                     entropy = -(probs * (probs + 1e-8).log()).sum(-1).mean()
                     
-                    # Imitation Loss
-                    imitation_loss = nn.CrossEntropyLoss()(logits, mb_expert_actions)
+                    # Imitation Loss (skip forward pass entirely when weight == 0)
+                    if c2_imitation > 0.0:
+                        imitation_loss = nn.CrossEntropyLoss()(logits, mb_expert_actions)
+                    else:
+                        imitation_loss = torch.tensor(0.0, device=device)
                     
                     # Auxiliary Q-Value Loss
                     # We train q_values to predict the advantage + value (which is mb_returns)
                     # For the actions actually taken, their Q-value should match the return.
-                    mb_primary_actions = torch.tensor([flat_actions[idx][0] for idx in mb_idx], dtype=torch.long, device=device)
-                    q_loss = nn.MSELoss()(q_values.gather(1, mb_primary_actions.unsqueeze(1)).squeeze(-1), mb_returns)
+                    mb_primary_actions = torch.tensor([flat_actions[idx][0] if len(flat_actions[idx]) > 0 else 0 for idx in mb_idx], dtype=torch.long, device=device)
+                    q_preds = q_values.gather(1, mb_primary_actions.unsqueeze(1)).squeeze(-1)
+                    valid_q_mask = torch.tensor([len(flat_actions[idx]) > 0 for idx in mb_idx], dtype=torch.bool, device=device)
+                    
+                    if valid_q_mask.any():
+                        q_loss = nn.MSELoss()(q_preds[valid_q_mask], mb_returns[valid_q_mask])
+                    else:
+                        q_loss = torch.tensor(0.0, device=device)
                     
                     loss = actor_loss + critic_loss - ENTROPY_COEF * entropy + c2_imitation * imitation_loss + 0.5 * q_loss
                     
@@ -472,6 +510,15 @@ def train():
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
                     optimizer.step()
+                    
+                    # Force free memory for minibatches
+                    del mb_states, mb_returns, mb_advantages, mb_expert_actions, mb_masks, mb_log_probs_old, mb_log_probs, logits, values, q_values, loss
+            
+            # Force free rollout memory before next rollout
+            del b_states, b_log_probs, b_returns, b_advantages, b_masks, b_expert_actions
+            del batch_states, batch_actions, batch_log_probs, batch_rewards, batch_dones, batch_values, batch_masks, batch_expert_actions
+            if device.type == 'cuda':
+                torch.cuda.empty_cache()
 
     except KeyboardInterrupt:
         print("Training interrupted manually.")

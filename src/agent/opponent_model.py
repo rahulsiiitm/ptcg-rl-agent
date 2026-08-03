@@ -35,11 +35,23 @@ class BayesianTracker:
         if not obs_dict:
             return
             
-        p2 = obs_dict.get("p2", {})
+        current = obs_dict.get("current", {})
+        players = current.get("players", [])
+        if len(players) < 2:
+            return
+            
+        try:
+            your_idx = int(current.get("yourIndex", 0))
+        except (ValueError, TypeError):
+            your_idx = 0
+            
+        opp_idx = 1 - your_idx if your_idx in [0, 1] else 1
+        p2 = players[opp_idx]
         
         # Parse hand/deck sizes (if available)
-        self.hand_size = float(len(p2.get("hand", [])))
-        self.deck_size = float(len(p2.get("deck", [])))
+        # Note: cabt engine uses 'handCount' and 'deckCount' for hidden opponent data
+        self.hand_size = float(p2.get("handCount", 0))
+        self.deck_size = float(p2.get("deckCount", 0))
         
         # Parse discard pile
         discard = p2.get("discard", [])

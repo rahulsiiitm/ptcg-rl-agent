@@ -23,7 +23,17 @@ class SelfPlayPool:
     def _get_historical_checkpoints(self):
         if not os.path.exists(self.pool_dir):
             return []
-        return glob.glob(os.path.join(self.pool_dir, "*.pth"))
+        checkpoints = glob.glob(os.path.join(self.pool_dir, "*.pth"))
+        
+        def extract_ep(path):
+            basename = os.path.basename(path)
+            try:
+                return int(basename.split('_')[1].split('.')[0])
+            except:
+                return -1
+                
+        checkpoints.sort(key=extract_ep, reverse=True)
+        return checkpoints[:10]
 
     def sample_opponent(self):
         """
@@ -62,6 +72,7 @@ class SelfPlayPool:
         if not hasattr(self, "_model_cache"):
             self._model_cache = {}
             self._model_mtimes = {}
+            self._cache_max_size = 5
 
         # We need to import ActorCritic locally to avoid circular imports 
         # or multiprocessing pickling issues if passed from main
@@ -72,7 +83,7 @@ class SelfPlayPool:
         
         encoder = _global_encoder
         state_dim = encoder.get_state_dim()
-        # Action space max is 100 for now, should match MAX_ACTION_SPACE in train_ppo
+        # Action space size matches MAX_ACTION_SPACE in train_ppo (currently 150)
         from src.agent.action_mask import MAX_ACTION_SPACE
         
         try:
@@ -86,6 +97,13 @@ class SelfPlayPool:
                 # strict=False allows loading even if q_critic is missing
                 model.load_state_dict(torch.load(model_path, map_location='cpu', weights_only=True), strict=False)
                 model.eval()
+                
+                # Evict random cached model if at capacity (to prevent RAM leak over 100k episodes)
+                if len(self._model_cache) >= self._cache_max_size:
+                    evict_key = random.choice(list(self._model_cache.keys()))
+                    del self._model_cache[evict_key]
+                    del self._model_mtimes[evict_key]
+                    
                 self._model_cache[model_path] = model
                 self._model_mtimes[model_path] = mtime
             except Exception as e:
