@@ -91,11 +91,11 @@ runtime. Crashes observed in Phase 2 were **Turn 0 deck-submission bugs**, not m
 
 ## Current status
 
-Phase 10 underway. The RL pipeline successfully reached 40,000+ episodes and we deployed a fully-functional Pure-NumPy inference pipeline with a Zero-Crash fallback. We are continuing diverse Meta Opponent Curriculum to push the Snorlax/Lopunny Deep RL agent past the 303.6 peak.
+Phase 11 underway. The Phase 10 PPO ensemble reached 55,000 episodes on the RTX 3050 and settled at **342.0 Elo** on the real Kaggle ladder (after briefly spiking to 600+). This officially breaks the previous 303.6 peak! We are now pushing towards 100,000 episodes.
 
-- **Current Peak (Phase 2): 303.6**
-- **Recent Best (Phase 9 BC Init): 282.3**
-- **Next Target:** Let the diverse meta-opponent curriculum run on the RTX 3050 over 100k+ episodes to achieve a >50% win rate against all tier-1 heuristic meta decks.
+- **Current Peak (Phase 10): 342.0**
+- **Recent Best (Phase 2): 303.6**
+- **Next Target:** Resume the diverse meta-opponent curriculum run on the RTX 3050 to hit 100,000 episodes and push for an even higher ladder rank.
 
 ## Local Hardware Specs
 - CPU: AMD Ryzen 5 5600H (12 logical cores)
