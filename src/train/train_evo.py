@@ -36,7 +36,16 @@ def mutate(base, mutation_rate=0.2, scale=300):
 
 def run_match(args):
     agent1_path, agent2_path = args
-    env = make("pokemon-tcg-ai-battle")
+    
+    # We must load the deck for cabt environment
+    try:
+        with open('deck.csv') as f:
+            deck = [int(line.strip()) for line in f.readlines() if line.strip()]
+    except Exception:
+        # Fallback if deck.csv is missing
+        deck = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] 
+        
+    env = make("cabt", configuration={"decks": [deck, deck]})
     try:
         steps = env.run([agent1_path, agent2_path])
         res = steps[-1][0]["observation"].get("result", -1)
