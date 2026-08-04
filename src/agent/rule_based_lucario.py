@@ -489,6 +489,7 @@ def agent(obs_dict: dict) -> list[int]:
                     ability_used = True
         return desc_indices[:select.maxCount]
     except Exception as e:
+        print(f"Agent Error: {e}")
         select_data = obs_dict.get("select", {})
         if not select_data:
             # Fallback for turn 0

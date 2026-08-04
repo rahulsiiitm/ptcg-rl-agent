@@ -20,4 +20,5 @@
 | 2026-08-02 | Phase 8 Heuristic | Lopunny/Froslass | **ERROR** | N/A | Errored out. |
 | 2026-08-02 | Phase 9 RL Agent (BC init) | Lopunny/Froslass | **282.3** | N/A | Great score! RL agent initialized from BC, getting very close to the 303.6 peak! |
 | 2026-08-02 | Phase 10 NumPy Pipeline | Lopunny/Froslass | **342.0** | 60% (6/10) | Peaked at 600+ but settled at 342. Still a NEW ALL-TIME HIGH! Reached 55k eps. |
-| 2026-08-03 | Phase 11 PPO Ensemble (82k eps) | Lopunny/Froslass | **PENDING** | 22-38% (50 games) | Submitted to Kaggle with memory leak fix and 3-model ensemble. Waiting for ladder score. |
+| 2026-08-03 | Phase 11 PPO Ensemble (82k eps) | Lopunny/Froslass | **342.0** | 22-38% (50 games) | Submitted to Kaggle with memory leak fix and 3-model ensemble. |
+| 2026-08-04 | Phase 12 Rule-Based Pivot | Mega Lucario | **600+** | 76% (38/50) | Switched entirely to Mega Lucario heuristic. Abandoned RL. |
