@@ -1,7 +1,11 @@
 # Pokémon TCG AI Battle Challenge: Strategy & Architecture Report
 
 ## Executive Summary
-Our approach breaks away from attempting to solve the entire Pokémon TCG game space. Traditional heuristic bots suffer from combinatorial explosion when playing complex decks, and pure deep-RL bots often timeout under Kaggle’s strict 600s inference limit or crash on illegal actions. We solved this with a hybrid architecture: a highly consistent **Snorlax/Lopunny Control Deck** piloted entirely by a PyTorch-trained **Deep Reinforcement Learning (PPO) Agent**, deployed via a **Pure-NumPy Inference Pipeline**. To guarantee 100% stability, this deep neural network is backed by a **Zero-Crash Heuristic Fallback System** that only triggers if the neural network encounters a critical error.
+
+> **[UPDATE - PHASE 12 PIVOT]**
+> *We have completely abandoned the Deep RL approach described below. After extensive testing, the PPO agent hit an Elo ceiling of ~340. In contrast, our hardcoded heuristic `rule_based_lucario.py` consistently hits 600+ Elo on the real Kaggle ladder. We are now exclusively running the Mega Lucario Rule-Based agent and upgrading it via Kaggle replay analysis. The rest of this document details the legacy RL architecture for historical reference.*
+
+Our legacy approach broke away from attempting to solve the entire Pokémon TCG game space. Traditional heuristic bots suffer from combinatorial explosion when playing complex decks, and pure deep-RL bots often timeout under Kaggle’s strict 600s inference limit or crash on illegal actions. We solved this with a hybrid architecture: a highly consistent **Snorlax/Lopunny Control Deck** piloted entirely by a PyTorch-trained **Deep Reinforcement Learning (PPO) Agent**, deployed via a **Pure-NumPy Inference Pipeline**. To guarantee 100% stability, this deep neural network is backed by a **Zero-Crash Heuristic Fallback System** that only triggers if the neural network encounters a critical error.
 
 ---
 

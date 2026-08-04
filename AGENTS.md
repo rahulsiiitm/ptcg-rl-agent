@@ -24,12 +24,9 @@ Deadlines: entry Aug 9, 2026 / final submission Aug 16, 2026.
 ## Build order (do not skip ahead)
 1. **Phase 0 — Deck selection**: mine `data/EN_Card_Data.csv` for a simple, 
    consistent, single-prize deck. Document rationale in `decks/deck_rationale.md`.
-2. **Phase 1 — Rule-based agent**: ship `src/agent/rule_based.py`, submit to the 
-   REAL ladder, log the result. This is the fallback and the baseline everything 
-   else must beat.
-3. **Phase 2 — RL/opponent-modeling layer**: only begins after Phase 1 has a real 
-   ladder score. Every RL agent version is A/B tested against the rule-based 
-   baseline's actual ladder μ before being promoted to `main.py`.
+2. **Phase 1 — Rule-based agent**: ship `src/agent/rule_based_lucario.py`, submit to the 
+   REAL ladder, log the result. This is our primary, highest-scoring agent (600+ Elo).
+3. **Phase 2 — Pivot & Optimization**: RL (PPO) maxed out at ~300 Elo and was abandoned. We are now purely focusing on upgrading the `rule_based_lucario.py` heuristic via local simulation trials and parsing Kaggle replays to fix misplays.
 
 ## Constraints
 - Submission = `main.py` (top-level, not nested) + `deck.csv`, tarballed via 
@@ -54,18 +51,9 @@ Effect Explanation. Loaded via `data/card_lookup.py`. Do not redistribute this f
 outside the project — it's subject to competition rules.
 
 ## Architecture
-- `src/env/fast_sim.py` — Gymnasium wrapper around the C++ `cg` engine (bypasses slow kaggle_environments).
-- `src/agent/rule_based.py` — Phase 1 heuristic agent (deployed, baseline).
-- `src/agent/policy.py` — Phase 2 RL policy. Pure NumPy inference; trained with PyTorch locally.
-- `src/agent/state_encoder.py` — Encodes cabt JSON obs → 24-dim float32 vector.
-- `src/agent/action_mask.py` — NumPy softmax + masked sampling over variable-length legal moves.
-- `src/agent/opponent_model.py` — tracks played/discarded/revealed cards to 
-  maintain a running probability estimate over the opponent's remaining deck/hand.
-- `src/env/reward.py` — shaped reward (win/loss + prizes taken + KOs + board 
-  advantage), isolated from the training loop for independent iteration.
-- `src/train/train_ppo.py` — PPO Actor-Critic (MLP 24→128→128→150). 1-step TD, Adam, CUDA.
-- `src/train/self_play.py` — checkpoint pool + `rule_based.py` kept as a permanent 
-  self-play opponent, to avoid overfitting to self-play only.
+- `src/agent/rule_based_lucario.py` — Primary heuristic agent (deployed).
+- `src/train/parse_replays.py` or `scripts/replay_debugger.py` — Parses Kaggle replays to identify where the heuristic agent made mistakes.
+- (RL components like `train_ppo.py`, `policy.py`, `state_encoder.py` are deprecated but kept for reference).
 
 ## Conventions
 - Keep `main.py` a thin loader only — no training or heuristic logic there, just 
@@ -91,11 +79,11 @@ runtime. Crashes observed in Phase 2 were **Turn 0 deck-submission bugs**, not m
 
 ## Current status
 
-Phase 11 underway. The Phase 10 PPO ensemble reached 55,000 episodes on the RTX 3050 and settled at **342.0 Elo** on the real Kaggle ladder (after briefly spiking to 600+). This officially breaks the previous 303.6 peak! We are now pushing towards 100,000 episodes.
+Phase 12: Pivot to Rule-Based. The Phase 11 PPO approach maxed out around 342.0 Elo, but the hardcoded `rule_based_lucario.py` agent consistently hits 600+ Elo on the real Kaggle ladder. We have abandoned the RL approach.
 
-- **Current Peak (Phase 10): 342.0**
-- **Recent Best (Phase 2): 303.6**
-- **Next Target:** Resume the diverse meta-opponent curriculum run on the RTX 3050 to hit 100,000 episodes and push for an even higher ladder rank.
+- **Current Peak (Rule-Based Lucario): 600+**
+- **Abandoned RL Peak: 342.0**
+- **Next Target:** Upgrade the Lucario heuristic by downloading Kaggle replays, stepping through game states, and explicitly patching edge cases and misplays.
 
 ## Local Hardware Specs
 - CPU: AMD Ryzen 5 5600H (12 logical cores)

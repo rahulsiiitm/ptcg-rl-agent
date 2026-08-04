@@ -1,7 +1,7 @@
 <h1 align="center">PTCG AI Battle Agent</h1>
 
 <p align="center">
-  <strong>Reinforcement Learning + Heuristic Agent for the Kaggle Pokémon TCG AI Battle Challenge</strong>
+  <strong>Heuristic Rule-Based Agent (Mega Lucario) for the Kaggle Pokémon TCG AI Battle Challenge</strong>
 </p>
 
 <p align="center">
@@ -40,9 +40,9 @@
 <table>
 <tr>
 <td valign="middle" width="85%">
-This repository houses our experimental pipeline for the Kaggle Pokémon TCG AI Battle Challenge. We are utilizing a <strong>PPO Reinforcement Learning (RL) Policy</strong> heavily augmented by a <strong>Safety Fallback Heuristic</strong>.
+This repository houses our pipeline for the Kaggle Pokémon TCG AI Battle Challenge. We initially explored PPO Reinforcement Learning, but discovered that a <strong>highly-tuned Heuristic Rule-Based Agent (Mega Lucario deck)</strong> vastly outperforms the RL policy (600+ Elo vs 300 Elo).
 <br><br>
-Rather than attempting to build a generalized bot that can play any deck (which historically fails due to combinatorial explosion and complex card interactions), our strategic focus is:
+Rather than attempting to build a generalized bot, our strategic focus is:
 <ol>
 <li><strong>Deck Simplicity:</strong> Pilot a simple, robust, high-consistency deck (e.g., Lopunny/Snorlax Control) that minimizes dead hands.</li>
 <li><strong>Crash-Proof Safety:</strong> The engine drops any submission that raises an exception. We utilize aggressive <code>try/except</code> fallbacks that automatically inspect the <code>cabt</code> engine's <code>minCount</code> and return legal dummy actions to survive edge-cases.</li>
@@ -67,9 +67,8 @@ We follow a strict **phase-gated deployment cycle**: a new agent iteration is on
 |---|---|---|---|
 | **Phase 0** | Complete | — | Deck Mine: Identified optimal, consistent 60-card decks. |
 | **Phase 1** | Complete | **170.1** | Naive Heuristic Baseline (Attack > Evolve > Attach). |
-| **Phase 2** | Complete | **303.6** | PPO + Pure-NumPy inference deployed. Current PB! |
-| **Phase 9** | Complete | **282.3** | Behavioral Cloning Initialization on Snorlax/Mega Lucario deck. |
-| **Current** | In Progress | Target: **>303.6** | **Phase 3 Scaling:** Meta Opponent Curriculum & 100k+ parallel episode training. |
+| **Phase 2-11 (RL)** | Abandoned | **342.0** | PPO + Pure-NumPy inference deployed. Hit a ceiling at ~340 Elo. |
+| **Phase 12 (Pivot)**| **Active** | **600+** | Pivoted to `rule_based_lucario.py`. Using Kaggle replays to identify misplays and patch the heuristic logic for Mega Lucario. |
 
 Full submission history and local benchmarks → [`eval/ladder_log.md`](eval/ladder_log.md)
 
