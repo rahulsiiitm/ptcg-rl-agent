@@ -6,7 +6,7 @@ import random
 import torch
 import collections
 
-sys.path.append(glob.glob('/kaggle/input/**/cg-lib', recursive=True)[0] if glob.glob('/kaggle/input/**/cg-lib', recursive=True) else 'd:/Projects/4th Year/ptcg-rl-agent/cg')
+sys.path.append(glob.glob('/kaggle/input/**/cg-lib', recursive=True)[0] if glob.glob('/kaggle/input/**/cg-lib', recursive=True) else os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from cg.game import battle_start, battle_finish, battle_select
 from src.agent.rule_based_lucario import agent as rule_based_agent
@@ -79,12 +79,16 @@ model = MyModel(128, 2, 256, 1, 1)
 model = model.to(device)
 
 # torch.compile gives ~15-30% speedup on Ampere for free (PyTorch 2.0+)
-if device.type == "cuda" and hasattr(torch, 'compile'):
-    try:
-        model = torch.compile(model, mode="reduce-overhead")
-        print("[GPU] torch.compile enabled (reduce-overhead mode)")
-    except Exception as e:
-        print(f"[GPU] torch.compile skipped: {e}")
+if device.type == "cuda":
+    # Triton (required for torch.compile inductor backend) is not supported natively on Windows
+    if sys.platform != "win32":
+        try:
+            model = torch.compile(model, mode="reduce-overhead")
+            print("[GPU] torch.compile enabled (reduce-overhead mode)")
+        except Exception as e:
+            print(f"[GPU] torch.compile failed: {e}")
+    else:
+        print("[GPU] torch.compile disabled (Windows does not support Triton natively)")
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, weight_decay=1e-4, fused=(device.type == "cuda"))
 
