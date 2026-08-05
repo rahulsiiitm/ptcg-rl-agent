@@ -15,6 +15,7 @@ Requires:
 """
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -35,26 +36,28 @@ def download_dataset(ref: str, out_dir: str) -> bool:
     """Downloads and unzips a dataset. Returns True on success."""
     slug = ref.split("/")[-1]
     dest = os.path.join(out_dir, slug)
-    if os.path.exists(dest) and len(os.listdir(dest)) > 0:
+
+    # Check if already fully extracted (has json files)
+    if os.path.exists(dest) and any(f.endswith('.json') for f in os.listdir(dest) if not f.startswith('.')):
         print(f"[SKIP] {slug} already downloaded.")
         return True
 
     os.makedirs(dest, exist_ok=True)
+    zip_path = os.path.join(dest, f"{slug}.zip")
+
     print(f"[DOWNLOAD] {ref} ...")
     try:
+        # Download as zip without --unzip so we control extraction
         result = subprocess.run(
-            [sys.executable, "-m", "kaggle", "datasets", "download", "-d", ref, "-p", dest, "--unzip"],
+            [sys.executable, "-m", "kaggle", "datasets", "download", "-d", ref, "-p", dest],
             capture_output=True, text=True, timeout=600
         )
     except KeyboardInterrupt:
         print("\n[CANCELLED] Download interrupted by user.")
-        try: os.rmdir(dest)
-        except OSError: pass
-        raise  # re-raise so the outer loop also exits cleanly
+        raise
     except subprocess.TimeoutExpired:
         print(f"  -> TIMEOUT after 10 minutes.")
-        try: os.rmdir(dest)
-        except OSError: pass
+        shutil.rmtree(dest, ignore_errors=True)
         return False
 
     if result.returncode != 0:
@@ -63,13 +66,28 @@ def download_dataset(ref: str, out_dir: str) -> bool:
             print(f"  -> SKIP (403 Forbidden — dataset not yet released or requires competition acceptance)")
         else:
             print(f"  -> FAILED: {stderr}")
-        try: os.rmdir(dest)
-        except OSError: pass
+        shutil.rmtree(dest, ignore_errors=True)
         return False
 
-    n = len(os.listdir(dest))
-    print(f"  -> OK ({n} files)")
-    return True
+    # Find the downloaded zip file
+    zips = [f for f in os.listdir(dest) if f.endswith('.zip')]
+    if not zips:
+        print(f"  -> No zip found after download.")
+        return False
+
+    zip_path = os.path.join(dest, zips[0])
+    print(f"  -> Extracting {zips[0]} ({os.path.getsize(zip_path)//1024**2} MB)...")
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as z:
+            z.extractall(dest)
+        os.remove(zip_path)  # Clean up zip after extraction
+        n = len([f for f in os.listdir(dest) if f.endswith('.json')])
+        print(f"  -> OK ({n} JSON files extracted)")
+        return True
+    except zipfile.BadZipFile:
+        print(f"  -> Bad zip file (incomplete download). Try again.")
+        shutil.rmtree(dest, ignore_errors=True)
+        return False
 
 def main():
     parser = argparse.ArgumentParser(description="Download recent PTCG Kaggle replay datasets.")
