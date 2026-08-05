@@ -74,6 +74,17 @@ scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=1000)
 best_win_rate = -1.0
 epoch = 0
 
+# ---- Load pretrained replay data (Imitation Learning seed) ----
+# Run `python scripts/parse_replays_to_training.py` first to generate this file.
+_pretrain_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "pretrain.pt")
+if os.path.exists(_pretrain_path):
+    _pretrain_samples = torch.load(_pretrain_path, weights_only=False)
+    replay_buffer.extend(_pretrain_samples)
+    print(f"[PRETRAIN] Loaded {len(_pretrain_samples)} samples from {_pretrain_path} into replay buffer.")
+else:
+    print(f"[PRETRAIN] No pretrain.pt found at {_pretrain_path}. Starting from scratch.")
+    print("  -> Run: python scripts/parse_replays_to_training.py")
+
 # The main training loop.
 while True:
     epoch += 1
