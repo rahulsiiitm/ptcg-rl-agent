@@ -7,10 +7,10 @@ if '__file__' in globals():
 else:
     sys.path.append('/kaggle_simulations/agent')
 
-from src.agent.rule_based_lucario import agent as lucario_agent
+from src.agent.hybrid_lucario import agent as hybrid_agent
 
 def agent(obs_dict):
     """
-    Kaggle entrypoint for the PTCG environment (Rule-Based Lucario Agent).
+    Kaggle entrypoint for the PTCG environment (Hybrid Lucario Agent).
     """
-    return lucario_agent(obs_dict)
+    return hybrid_agent(obs_dict)
