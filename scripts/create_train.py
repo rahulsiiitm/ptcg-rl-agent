@@ -21,7 +21,7 @@ import math
 import random
 import torch
 
-sys.path.append(glob.glob('/kaggle/input/**/cg-lib', recursive=True)[0] if glob.glob('/kaggle/input/**/cg-lib', recursive=True) else 'd:/Projects/4th Year/ptcg-rl-agent/cg')
+sys.path.append(glob.glob('/kaggle/input/**/cg-lib', recursive=True)[0] if glob.glob('/kaggle/input/**/cg-lib', recursive=True) else os.path.dirname(os.path.dirname(__file__)))
 
 from cg.game import battle_start, battle_finish, battle_select
 from src.agent.hybrid_lucario import (
