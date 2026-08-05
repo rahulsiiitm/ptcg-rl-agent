@@ -41,20 +41,34 @@ def download_dataset(ref: str, out_dir: str) -> bool:
 
     os.makedirs(dest, exist_ok=True)
     print(f"[DOWNLOAD] {ref} ...")
-    result = subprocess.run(
-        [sys.executable, "-m", "kaggle", "datasets", "download", "-d", ref, "-p", dest, "--unzip"],
-        capture_output=True, text=True
-    )
-    if result.returncode != 0:
-        print(f"  -> FAILED: {result.stderr.strip()}")
-        # Cleanup empty dir
-        try:
-            os.rmdir(dest)
-        except OSError:
-            pass
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "kaggle", "datasets", "download", "-d", ref, "-p", dest, "--unzip"],
+            capture_output=True, text=True, timeout=600
+        )
+    except KeyboardInterrupt:
+        print("\n[CANCELLED] Download interrupted by user.")
+        try: os.rmdir(dest)
+        except OSError: pass
+        raise  # re-raise so the outer loop also exits cleanly
+    except subprocess.TimeoutExpired:
+        print(f"  -> TIMEOUT after 10 minutes.")
+        try: os.rmdir(dest)
+        except OSError: pass
         return False
 
-    print(f"  -> OK ({len(os.listdir(dest))} files)")
+    if result.returncode != 0:
+        stderr = result.stderr.strip()
+        if "403" in stderr or "Forbidden" in stderr:
+            print(f"  -> SKIP (403 Forbidden — dataset not yet released or requires competition acceptance)")
+        else:
+            print(f"  -> FAILED: {stderr}")
+        try: os.rmdir(dest)
+        except OSError: pass
+        return False
+
+    n = len(os.listdir(dest))
+    print(f"  -> OK ({n} files)")
     return True
 
 def main():
