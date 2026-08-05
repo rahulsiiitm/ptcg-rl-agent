@@ -1,0 +1,14 @@
+{
+  "play_pokemon_base": 20000,
+  "play_dusk_pad": 8000,
+  "play_switch": 6000,
+  "play_premium": 5000,
+  "play_boss": 3200,
+  "play_carmine": 3000,
+  "play_lillie": 3100,
+  "attach_hero_cape": 7000,
+  "evolve_base": 9000,
+  "ability_base": 30000,
+  "retreat_base": 2000,
+  "attack_base": 1000
+}
