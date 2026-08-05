@@ -37,31 +37,55 @@ from src.agent.hybrid_lucario import LearnSample, get_encoder_input, get_decoder
 REPLAY_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "replays")
 
 def load_replay_files(limit: int) -> list[dict]:
-    """Loads replay JSON files from REPLAY_DIR."""
-    all_files = []
+    """Loads replay JSON files from REPLAY_DIR (including those inside .zip files)."""
+    import zipfile
+    episodes = []
+    
+    # 1. Process standard JSON files on disk
     for root, dirs, files in os.walk(REPLAY_DIR):
         for fn in files:
             if fn.endswith(".json"):
-                all_files.append(os.path.join(root, fn))
+                fp = os.path.join(root, fn)
+                try:
+                    with open(fp, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    batch = data if isinstance(data, list) else [data]
+                    episodes.extend(batch)
+                except Exception as e:
+                    print(f"  [SKIP] {fp}: {e}")
+                
+                if limit and len(episodes) >= limit:
+                    return episodes[:limit]
 
-    if not all_files:
-        print(f"No replay files found in {REPLAY_DIR}. Run download_replays.py first.")
+    # 2. Process JSON files dynamically from inside .zip files to save disk space
+    for root, dirs, files in os.walk(REPLAY_DIR):
+        for fn in files:
+            if fn.endswith(".zip"):
+                zip_path = os.path.join(root, fn)
+                print(f"Scanning zip: {fn}...")
+                try:
+                    with zipfile.ZipFile(zip_path, 'r') as z:
+                        for zinfo in z.infolist():
+                            if zinfo.filename.endswith(".json"):
+                                try:
+                                    with z.open(zinfo) as f:
+                                        data = json.load(f)
+                                    batch = data if isinstance(data, list) else [data]
+                                    episodes.extend(batch)
+                                except Exception as e:
+                                    pass # Corrupt JSON inside zip
+                                
+                                if limit and len(episodes) >= limit:
+                                    return episodes[:limit]
+                except zipfile.BadZipFile:
+                    print(f"  [SKIP] {fn}: Bad Zip File")
+
+    if not episodes:
+        print(f"No replay data found in {REPLAY_DIR}. Run download_replays.py first.")
         sys.exit(1)
 
-    print(f"Found {len(all_files)} replay files.")
-    episodes = []
-    for fp in all_files:
-        try:
-            with open(fp, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            batch = data if isinstance(data, list) else [data]
-            episodes.extend(batch)
-        except Exception as e:
-            print(f"  [SKIP] {fp}: {e}")
-        if limit and len(episodes) >= limit:
-            break
-
-    return episodes[:limit] if limit else episodes
+    print(f"Loaded {len(episodes)} replay episodes total.")
+    return episodes
 
 def parse_episode_to_samples(ep: dict) -> list[LearnSample]:
     """

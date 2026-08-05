@@ -33,21 +33,21 @@ def get_recent_dataset_refs(num_days: int = 4) -> list[str]:
     return refs
 
 def download_dataset(ref: str, out_dir: str) -> bool:
-    """Downloads and unzips a dataset. Returns True on success."""
+    """Downloads a dataset as a zip file. Returns True on success."""
     slug = ref.split("/")[-1]
     dest = os.path.join(out_dir, slug)
 
-    # Check if already fully extracted (has json files)
-    if os.path.exists(dest) and any(f.endswith('.json') for f in os.listdir(dest) if not f.startswith('.')):
+    # Check if we already have the downloaded zip
+    expected_zip = os.path.join(out_dir, f"{slug}.zip")
+    if os.path.exists(expected_zip):
         print(f"[SKIP] {slug} already downloaded.")
         return True
 
     os.makedirs(dest, exist_ok=True)
-    zip_path = os.path.join(dest, f"{slug}.zip")
-
+    
     print(f"[DOWNLOAD] {ref} ...")
     try:
-        # Download as zip without --unzip so we control extraction
+        # Download as zip without --unzip
         result = subprocess.run(
             [sys.executable, "-m", "kaggle", "datasets", "download", "-d", ref, "-p", dest],
             capture_output=True, text=True, timeout=600
@@ -69,25 +69,22 @@ def download_dataset(ref: str, out_dir: str) -> bool:
         shutil.rmtree(dest, ignore_errors=True)
         return False
 
-    # Find the downloaded zip file
+    # Find the downloaded zip file and move it to the parent directory
     zips = [f for f in os.listdir(dest) if f.endswith('.zip')]
     if not zips:
         print(f"  -> No zip found after download.")
-        return False
-
-    zip_path = os.path.join(dest, zips[0])
-    print(f"  -> Extracting {zips[0]} ({os.path.getsize(zip_path)//1024**2} MB)...")
-    try:
-        with zipfile.ZipFile(zip_path, 'r') as z:
-            z.extractall(dest)
-        os.remove(zip_path)  # Clean up zip after extraction
-        n = len([f for f in os.listdir(dest) if f.endswith('.json')])
-        print(f"  -> OK ({n} JSON files extracted)")
-        return True
-    except zipfile.BadZipFile:
-        print(f"  -> Bad zip file (incomplete download). Try again.")
         shutil.rmtree(dest, ignore_errors=True)
         return False
+
+    downloaded_zip = os.path.join(dest, zips[0])
+    target_zip = os.path.join(out_dir, f"{slug}.zip")
+    shutil.move(downloaded_zip, target_zip)
+    
+    # Remove the temporary download folder
+    shutil.rmtree(dest, ignore_errors=True)
+    
+    print(f"  -> OK ({os.path.getsize(target_zip)//1024**2} MB zip saved)")
+    return True
 
 def main():
     parser = argparse.ArgumentParser(description="Download recent PTCG Kaggle replay datasets.")
