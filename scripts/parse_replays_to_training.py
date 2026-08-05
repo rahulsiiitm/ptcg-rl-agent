@@ -36,30 +36,28 @@ from src.agent.hybrid_lucario import LearnSample, get_encoder_input, get_decoder
 
 REPLAY_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "replays")
 
-def load_replay_files(limit: int) -> list[dict]:
+def load_replay_files(limit: int = None):
     """Loads replay JSON files from REPLAY_DIR (including those inside .zip files)."""
     import zipfile
-    episodes = []
-    
-    # 1. Process standard JSON files on disk
+    count = 0
     for root, dirs, files in os.walk(REPLAY_DIR):
-        for fn in files:
+        for fn in sorted(files):
             if fn.endswith(".json"):
-                fp = os.path.join(root, fn)
-                try:
-                    with open(fp, "r", encoding="utf-8") as f:
+                # Handle single unzipped JSON (rare in this dataset)
+                path = os.path.join(root, fn)
+                with open(path, "r", encoding="utf-8") as f:
+                    try:
                         data = json.load(f)
-                    batch = data if isinstance(data, list) else [data]
-                    episodes.extend(batch)
-                except Exception as e:
-                    print(f"  [SKIP] {fp}: {e}")
-                
-                if limit and len(episodes) >= limit:
-                    return episodes[:limit]
-
-    # 2. Process JSON files dynamically from inside .zip files to save disk space
-    for root, dirs, files in os.walk(REPLAY_DIR):
-        for fn in files:
+                    except json.JSONDecodeError as e:
+                        print(f"  [SKIP] {path}: {e}")
+                        continue
+                batch = data if isinstance(data, list) else [data]
+                for ep in batch:
+                    yield ep
+                    count += 1
+                    if limit and count >= limit:
+                        return
+                        
             if fn.endswith(".zip"):
                 zip_path = os.path.join(root, fn)
                 print(f"Scanning zip: {fn}...")
@@ -71,21 +69,25 @@ def load_replay_files(limit: int) -> list[dict]:
                                     with z.open(zinfo) as f:
                                         data = json.load(f)
                                     batch = data if isinstance(data, list) else [data]
-                                    episodes.extend(batch)
+                                    for ep in batch:
+                                        yield ep
+                                        count += 1
+                                        if count > 0 and count % 10 == 0:
+                                            print(f"  -> Extracted {count} valid replays so far...")
+                                        if limit and count >= limit:
+                                            return
                                 except Exception as e:
                                     pass # Corrupt JSON inside zip
-                                
-                                if limit and len(episodes) >= limit:
-                                    return episodes[:limit]
                 except zipfile.BadZipFile:
                     print(f"  [SKIP] {fn}: Bad Zip File")
 
-    if not episodes:
+    if count == 0:
         print(f"No replay data found in {REPLAY_DIR}. Run download_replays.py first.")
         sys.exit(1)
 
-    print(f"Loaded {len(episodes)} replay episodes total.")
-    return episodes
+deck_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "deck.csv")
+with open(deck_path, "r", encoding="utf-8") as f:
+    LUCARIO_DECK = [int(line) for line in f.read().splitlines() if line.strip()]
 
 def parse_episode_to_samples(ep: dict) -> list[LearnSample]:
     """
@@ -126,16 +128,40 @@ def parse_episode_to_samples(ep: dict) -> list[LearnSample]:
                 if n_options == 0:
                     continue
 
-                sv_enc = get_encoder_input(obs)
-                sv_dec = get_decoder_input(obs)
+                actions_list = []
+                indices = list(range(obs.select.maxCount))
+                for _ in range(64):
+                    actions_list.append(indices.copy())
+                    for i in range(len(indices)):
+                        index = len(indices) - i - 1
+                        if indices[index] < len(obs.select.option) - i - 1:
+                            indices[index] += 1
+                            for j in range(index+1, len(indices)):
+                                indices[j] = indices[j - 1] + 1
+                            break
+                    else:
+                        break
+
+                sv_enc = get_encoder_input(obs, LUCARIO_DECK)
+                sv_dec = get_decoder_input(obs, actions_list)
 
                 # Build a one-hot policy from the actual action taken
-                policy = [0.0] * n_options
-                for a in (action if isinstance(action, list) else [action]):
-                    if isinstance(a, int) and 0 <= a < n_options:
-                        policy[a] = 1.0
-                if sum(policy) == 0:
-                    continue
+                policy = [0.0] * len(actions_list)
+                
+                # The Kaggle 'action' is what they actually chose. We need to match it to actions_list.
+                # Kaggle action could be an int or a list of ints.
+                actual_action = action if isinstance(action, list) else [action]
+                
+                match_idx = -1
+                for idx, act in enumerate(actions_list):
+                    if act == actual_action:
+                        match_idx = idx
+                        break
+                
+                if match_idx == -1:
+                    continue # Action not found in the up-to-64 generated list
+                
+                policy[match_idx] = 1.0
                 # Normalize
                 total = sum(policy)
                 policy = [p / total for p in policy]
@@ -144,14 +170,12 @@ def parse_episode_to_samples(ep: dict) -> list[LearnSample]:
                 player_idx = obs.current.yourIndex
                 value = 1.0 if player_idx == winner_idx else -1.0
 
-                s = LearnSample()
-                s.sv_enc = sv_enc
-                s.sv_dec = sv_dec
-                s.policy = policy
-                s.value = value
+                s = LearnSample(value=value, policy=policy, sv_enc=sv_enc, sv_dec=sv_dec)
                 samples.append(s)
 
-            except Exception:
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
                 continue
 
     return samples
@@ -165,15 +189,15 @@ def main():
     out_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), args.out)
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
-    episodes = load_replay_files(args.limit)
-    print(f"Parsing {len(episodes)} episodes ...")
+    episodes_generator = load_replay_files(args.limit)
+    print(f"Parsing episodes up to limit {args.limit} ...")
 
     all_samples = []
-    for i, ep in enumerate(episodes):
+    for i, ep in enumerate(episodes_generator):
         samples = parse_episode_to_samples(ep)
         all_samples.extend(samples)
         if (i + 1) % 100 == 0:
-            print(f"  {i+1}/{len(episodes)} episodes -> {len(all_samples)} samples so far")
+            print(f"  {i+1} episodes -> {len(all_samples)} samples so far")
 
     print(f"\nTotal training samples: {len(all_samples)}")
     torch.save(all_samples, out_path)
