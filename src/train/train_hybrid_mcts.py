@@ -94,7 +94,8 @@ loss_fn_dec = torch.nn.HuberLoss(reduction="none", delta=0.1)  # Decoder loss fu
 os.makedirs("out", exist_ok=True)
 
 replay_buffer = collections.deque(maxlen=50000)
-scaler = torch.amp.GradScaler() if device.type == "cuda" else None
+# GradScaler for AMP: PyTorch 2.5 uses GradScaler("cuda") syntax
+scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=1000)
 best_win_rate = -1.0
 epoch = 0
