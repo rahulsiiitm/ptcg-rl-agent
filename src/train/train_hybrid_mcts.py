@@ -4,19 +4,42 @@ import glob
 import math
 import random
 import torch
+import collections
 
 sys.path.append(glob.glob('/kaggle/input/**/cg-lib', recursive=True)[0] if glob.glob('/kaggle/input/**/cg-lib', recursive=True) else 'd:/Projects/4th Year/ptcg-rl-agent/cg')
 
 from cg.game import battle_start, battle_finish, battle_select
+from src.agent.rule_based_lucario import agent as rule_based_agent
 from src.agent.hybrid_lucario import (
     MyModel, LearnSample, LearnInput, mcts_agent, random_agent, 
     get_encoder_input, get_decoder_input, SparseVector
 )
+import src.agent.hybrid_lucario as hybrid_module
+
+# Use a higher search count for local GPU training for stronger self-play data
+hybrid_module.SEARCH_COUNT = 20
 
 # Load the actual Lucario deck
 deck_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "deck.csv")
 with open(deck_path, "r", encoding="utf-8") as f:
-    sample_deck = [int(line) for line in f.read().splitlines() if line.strip()]
+    lucario_deck = [int(line) for line in f.read().splitlines() if line.strip()]
+
+# Load opponent decks
+opponent_decks = []
+decks_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "top20_decks")
+if os.path.exists(decks_dir):
+    for fn in os.listdir(decks_dir):
+        if fn.endswith('.csv'):
+            with open(os.path.join(decks_dir, fn), "r", encoding="utf-8") as f:
+                deck = [int(line) for line in f.read().splitlines() if line.strip()][:60]
+                if len(deck) == 60:
+                    opponent_decks.append(deck)
+
+if not opponent_decks:
+    opponent_decks = [lucario_deck]
+
+def get_random_opponent_deck():
+    return random.choice(opponent_decks)
 
 def progress(count: int, text: str):
     current = 0
@@ -45,13 +68,17 @@ loss_fn_dec = torch.nn.HuberLoss(reduction="none", delta=0.1)  # Decoder loss fu
 
 os.makedirs("out", exist_ok=True)
 
-
+replay_buffer = collections.deque(maxlen=50000)
+scaler = torch.amp.GradScaler(device.type) if device.type == "cuda" else None
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=1000)
+best_win_rate = -1.0
+epoch = 0
 
 # The main training loop.
-
-for counter in range(5):
-
-    torch.save(model.state_dict(), "model_best.pth")  # Save the current model.
+while True:
+    epoch += 1
+    print(f"\n=== Epoch {epoch} ===")
+    torch.save(model.state_dict(), "model_latest.pth")
 
     sample_list:list[LearnSample] = []  # List of training data samples.
 
@@ -68,8 +95,8 @@ for counter in range(5):
 
 
         for i in progress(50, "Evaluating... "):
-
-            obs, start_data = battle_start(sample_deck, sample_deck)
+            op_deck = get_random_opponent_deck()
+            obs, start_data = battle_start(lucario_deck, op_deck)
 
             if start_data.errorPlayer >= 0:
 
@@ -107,11 +134,11 @@ for counter in range(5):
 
                 if obs["current"]["yourIndex"] == your_index:
 
-                    selected, _ = mcts_agent(obs, sample_deck, model)
+                    selected, _ = mcts_agent(obs, lucario_deck, model)
 
                 else:
-
-                    selected = random_agent(obs)
+                    # Use rule-based agent as the opponent for a stronger eval baseline
+                    selected = rule_based_agent(obs)
 
                 obs = battle_select(selected)
 
@@ -133,15 +160,26 @@ for counter in range(5):
 
                 results[1] += 1
 
-        print("Evaluation win rate " + str(100 * results[0] // (results[0] + results[1])) + "%", flush=True)
+        win_rate = 100 * results[0] / max(1, (results[0] + results[1]))
+        print("Evaluation win rate " + str(win_rate) + "%", flush=True)
+        if win_rate >= best_win_rate:
+            best_win_rate = win_rate
+            torch.save(model.state_dict(), "model_best.pth")
+            print("New best model saved!")
 
 
 
         # Self Play
 
         for _ in progress(100, "Training Data Collecting... "):
-
-            obs, _ = battle_start(sample_deck, sample_deck)
+            op_deck = get_random_opponent_deck()
+            # Randomize who goes first / which deck is player 0
+            if random.random() < 0.5:
+                p0_deck, p1_deck = lucario_deck, op_deck
+            else:
+                p0_deck, p1_deck = op_deck, lucario_deck
+                
+            obs, _ = battle_start(p0_deck, p1_deck)
 
             samples:list[list[LearnSample]] = [[], []]  # [Player0 samples, Player1 samples]
 
@@ -154,8 +192,8 @@ for counter in range(5):
 
 
                 # The MCTS agent generates an action and a training sample.
-
-                selected, sample = mcts_agent(obs, sample_deck, model)
+                current_deck = p0_deck if obs["current"]["yourIndex"] == 0 else p1_deck
+                selected, sample = mcts_agent(obs, current_deck, model)
 
                 samples[obs["current"]["yourIndex"]].append(sample)
 
@@ -194,16 +232,24 @@ for counter in range(5):
 
 
     # Train on the training data collected through self-play.
-
     print("Training Start.")
-
     model.train()
-
-    random.shuffle(sample_list)
+    
+    # Append new samples to the replay buffer
+    replay_buffer.extend(sample_list)
+    
+    # We will sample from the entire replay buffer
+    train_data = list(replay_buffer)
+    random.shuffle(train_data)
 
     BATCH_SIZE = 128
-
-    batch_count = len(sample_list) // BATCH_SIZE
+    
+    # Limit to 500 batches per epoch to keep training fast
+    batch_count = min(len(train_data) // BATCH_SIZE, 500)
+    
+    if batch_count == 0:
+        print("Not enough data to train yet.")
+        continue
 
     for i in range(batch_count):
 
@@ -222,9 +268,7 @@ for counter in range(5):
         start = BATCH_SIZE * i
 
         for j in range(start, start + BATCH_SIZE):
-
-            sample = sample_list[j]
-
+            sample = train_data[j]
             input_enc.add(sample.sv_enc)
 
             input_dec.add(sample.sv_dec)
@@ -267,44 +311,33 @@ for counter in range(5):
 
 
 
-        # Get model predictions for the batch.
-
-        out_enc, out_dec = model(
-
-            torch.tensor(input_enc.index, dtype=torch.int32, device=device),
-
-            torch.tensor(input_enc.value, dtype=torch.float32, device=device),
-
-            torch.tensor(input_enc.offset, dtype=torch.int32, device=device),
-
-            torch.tensor(input_dec.index, dtype=torch.int32, device=device),
-
-            torch.tensor(input_dec.value, dtype=torch.float32, device=device),
-
-            torch.tensor(input_dec.offset, dtype=torch.int32, device=device))
-
-        
-
-        # Calculate loss.
-
-        loss_enc = loss_fn_enc(out_enc, label_tensor_enc)
-
-        loss_dec = loss_fn_dec(out_dec, label_tensor_dec)
-
-        loss_dec = loss_dec * mask_tensor
-
-        loss_dec = loss_dec.sum() / float(BATCH_SIZE)
-
-        loss = loss_enc + loss_dec
-
-
+        # Get model predictions for the batch with AMP.
+        with torch.autocast(device_type=device.type, enabled=(device.type == "cuda")):
+            out_enc, out_dec = model(
+                torch.tensor(input_enc.index, dtype=torch.int32, device=device),
+                torch.tensor(input_enc.value, dtype=torch.float32, device=device),
+                torch.tensor(input_enc.offset, dtype=torch.int32, device=device),
+                torch.tensor(input_dec.index, dtype=torch.int32, device=device),
+                torch.tensor(input_dec.value, dtype=torch.float32, device=device),
+                torch.tensor(input_dec.offset, dtype=torch.int32, device=device))
+            
+            # Calculate loss.
+            loss_enc = loss_fn_enc(out_enc, label_tensor_enc)
+            loss_dec = loss_fn_dec(out_dec, label_tensor_dec)
+            loss_dec = loss_dec * mask_tensor
+            loss_dec = loss_dec.sum() / float(BATCH_SIZE)
+            loss = loss_enc + loss_dec
 
         # Backpropagate the loss and update model parameters.
+        if scaler is not None:
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            optimizer.step()
 
-        loss.backward()
-
-        optimizer.step()
-
-    print("Training Finish.")
+    scheduler.step()
+    print(f"Training Finish. LR: {scheduler.get_last_lr()[0]:.6f}")
 
 

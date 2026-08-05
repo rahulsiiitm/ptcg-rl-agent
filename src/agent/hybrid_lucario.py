@@ -20,7 +20,11 @@ import torch.optim
 
 
 
-sys.path.append(glob.glob('/kaggle/input/**/cg-lib', recursive=True)[0])
+_cg_paths = glob.glob('/kaggle/input/**/cg-lib', recursive=True)
+if _cg_paths:
+    sys.path.append(_cg_paths[0])
+elif os.path.exists(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'cg')):
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
 
@@ -92,7 +96,7 @@ decoder_size = decoder_card_offset + (1 + decoder_main_feature + SelectContext.R
 
 
 
-SEARCH_COUNT = 10 # MCTS Search count
+SEARCH_COUNT = 3  # Restricted for Kaggle CPU inference (10 min time limit). Increase for local training.
 
 
 
@@ -1094,9 +1098,19 @@ def progress(count: int, text: str):
 
 
 
-# A sample deck for training.
-
-sample_deck = [721,721,722,722,722,722,723,723,723,723,1092,1121,1121,1145,1145,1163,1163,1219,1219,1219,1219,1227,1227,1227,1227,1262,1262,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3]
+# ---- Module-level deck cache (loaded once, not every turn) ----
+_deck_path_candidates = [
+    os.path.join(os.path.dirname(__file__), "deck.csv"),
+    "/kaggle_simulations/agent/deck.csv",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "deck.csv"),
+    "deck.csv",
+]
+_my_deck_cache: list[int] = []
+for _dp in _deck_path_candidates:
+    if os.path.exists(_dp):
+        with open(_dp, "r", encoding="utf-8") as _f:
+            _my_deck_cache = [int(l) for l in _f.read().splitlines() if l.strip()]
+        break
 
 
 
@@ -1133,27 +1147,13 @@ def agent(obs_dict, configuration=None):
             return rule_based_agent(obs_dict, configuration)
             
         # Use MCTS + Transformer for the complex MAIN phase
-        model = get_hybrid_model("cpu") # Kaggle uses CPU for inference
+        model = get_hybrid_model("cpu")  # Kaggle uses CPU for inference
         
-        # We need the deck for MCTS state sampling.
-        # Load from deck.csv
-        deck_path = os.path.join(os.path.dirname(__file__), "deck.csv")
-        if not os.path.exists(deck_path):
-            deck_path = "/kaggle_simulations/agent/deck.csv"
-        if not os.path.exists(deck_path):
-            deck_path = "deck.csv"
+        # Use the module-level cached deck (loaded once at import time)
+        my_deck = _my_deck_cache
             
-        my_deck = []
-        if os.path.exists(deck_path):
-            with open(deck_path, "r", encoding="utf-8") as f:
-                my_deck = [int(line) for line in f.read().splitlines() if line.strip()]
-            
-        # Hack to reduce search count on Kaggle CPU so we don't timeout (10 min total per match)
-        global SEARCH_COUNT
-        SEARCH_COUNT = 3 # Heavily restricted for CPU.
-        
         selected, _ = mcts_agent(obs_dict, my_deck, model)
         return selected
-    except Exception as e:
+    except Exception:
         # Fallback to rule-based if anything crashes in the neural network
         return rule_based_agent(obs_dict, configuration)
