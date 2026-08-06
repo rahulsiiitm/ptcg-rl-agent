@@ -24,7 +24,7 @@
 
 ---
 
-## 🧠 Overview
+## Overview
 
 This repository contains an experimental AI agent for the **Kaggle Pokémon TCG AI Battle Challenge**.
 
@@ -37,7 +37,7 @@ The project began as a reinforcement-learning system and evolved into a broader 
   <img src="https://play.pokemonshowdown.com/sprites/ani/mewtwo.gif" width="150" alt="Mewtwo" />
 </div>
 
-### 🏆 Current Result
+### Current Result
 
 **958.8** is the best recorded ladder score from **Mega Lucario v19**.
 
@@ -47,7 +47,7 @@ The best RL/PPO submission reached **342.0**, which became the turning point for
 
 ---
 
-## ⚡ What the System Does
+## What the System Does
 
 The agent converts a live Pokémon TCG game state into a legal, strategically ranked action.
 
@@ -95,7 +95,7 @@ The architecture is modular: simulation, state representation, policy logic, act
 
 ---
 
-## 🐉 Architecture
+## Architecture
 
 ### 1. Game Simulation Layer
 
@@ -178,7 +178,7 @@ Masking is critical for competition stability because invalid engine actions can
 
 ---
 
-## 🤖 Reinforcement Learning Pipeline
+## Reinforcement Learning Pipeline
 
 One major branch of the project explored PPO-based learning from simulated games.
 
@@ -222,7 +222,7 @@ Rewards combine terminal outcomes with intermediate game-state signals:
 
 ---
 
-## 🥊 Heuristic Planning: Mega Lucario
+## Heuristic Planning: Mega Lucario
 
 The strongest agent in the repository is currently the **Mega Lucario rule-based policy**.
 
@@ -266,7 +266,7 @@ The policy contains specialized logic for setup, evolution, energy management, a
 
 ---
 
-## 🔎 Replay-Driven Improvement
+## Replay-Driven Improvement
 
 Real Kaggle games are treated as debugging data rather than merely as a final score.
 
@@ -308,7 +308,7 @@ Replay analysis was used to identify tactical failures including attack timing, 
 
 ---
 
-## 🧬 Evolutionary Policy Tuning
+## Evolutionary Policy Tuning
 
 The heuristic policy exposes action-priority weights that can be mutated and evaluated automatically.
 
@@ -333,7 +333,7 @@ This creates a lightweight black-box optimization layer around the hand-engineer
 
 ---
 
-## 🧪 Hybrid & Search Experiments
+## Hybrid & Search Experiments
 
 The repository also contains experiments beyond vanilla PPO and hand-written heuristics, including Transformer-based policy representations and MCTS-style search.
 
@@ -364,7 +364,7 @@ These experiments form the research path toward combining learned representation
 
 ---
 
-## 🏆 Competition Results
+## Competition Results
 
 The project uses a phase-gated workflow: new strategies are promoted only after empirical testing against the real competition environment.
 
@@ -384,7 +384,7 @@ See [`eval/ladder_log.md`](eval/ladder_log.md) for the complete experiment histo
 
 ---
 
-## 🧩 Why RL Was Not the Final Winner
+## Why RL Was Not the Final Winner
 
 The project is intentionally not presented as “more neural network = better agent.”
 
@@ -422,7 +422,7 @@ The result is an empirical decision-making system built around the constraints o
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```text
 ptcg-rl-agent/
@@ -460,7 +460,7 @@ ptcg-rl-agent/
 
 ---
 
-## 🚀 Deployment Pipeline
+## Deployment Pipeline
 
 Training and competition inference are separated.
 
@@ -496,13 +496,13 @@ For neural inference, PyTorch weights can be exported to `.npz` and evaluated us
 
 ---
 
-## 🛠️ Local Setup
+## Local Setup
 
 ```bash
 python -m venv .venv
 
 # Windows
-.venv\Scripts\activate
+.venv\\Scripts\\activate
 
 # Linux / macOS
 source .venv/bin/activate
@@ -532,7 +532,7 @@ pytest
 
 ---
 
-## 💡 Lessons From the Experiment
+## Lessons From the Experiment
 
 ### 1. More complex RL does not guarantee a better game agent
 
@@ -556,7 +556,7 @@ The project moved from PPO → hybrid experiments → heuristic planning because
 
 ---
 
-## 🔮 Future Work
+## Future Work
 
 - Implement canonical clipped PPO with proper rollout buffers and multi-step advantage estimation.
 - Combine learned policy scores with heuristic tactical priors.
@@ -569,7 +569,7 @@ The project moved from PPO → hybrid experiments → heuristic planning because
 
 ---
 
-## 📚 References
+## References
 
 - [cabt Engine Documentation](https://matsuoinstitute.github.io/cabt/)
 - [Kaggle Pokémon TCG AI Battle](https://www.kaggle.com/competitions/pokemon-tcg-ai-battle)
@@ -579,6 +579,6 @@ The project moved from PPO → hybrid experiments → heuristic planning because
 
 ---
 
-## ⚖️ License
+## License
 
 Competition-specific code and assets are subject to the applicable competition rules and terms. See the competition documentation before redistributing engine files, datasets, or submission artifacts.
