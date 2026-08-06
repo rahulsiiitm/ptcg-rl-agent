@@ -81,10 +81,10 @@ runtime. Crashes observed in Phase 2 were **Turn 0 deck-submission bugs**, not m
 
 Phase 12: Pivot to Rule-Based. The Phase 11 PPO approach maxed out around 342.0 Elo, but the hardcoded `rule_based_lucario.py` agent consistently hits 600+ Elo on the real Kaggle ladder. We have abandoned the RL approach.
 
-- **Current Active Build:** **v17** (`v17.tar.gz` / `submissions/v17.tar.gz`) — Contains 3 Replay Tactical Fixes + 4 Universal Refinements.
-- **Current Peak (Rule-Based Lucario): 936.0** (Active ladder score ~902 / 846 variance range)
+- **Current Active Build:** **v18** (`v18.tar.gz` / `submissions/v18.tar.gz`) — Critical Hotfix for Attack/Supporter logic bugs that caused v17 to drop to 774 Elo.
+- **Current Peak (Rule-Based Lucario): 936.0** (Active ladder score ~774 due to v17 bugs, expecting rapid recovery with v18)
 - **Abandoned RL Peak: 342.0**
-- **Next Target:** Target 1000+ Elo on Kaggle ladder with v17.
+- **Next Target:** Target 1000+ Elo on Kaggle ladder with v18.
 
 
 

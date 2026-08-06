@@ -465,16 +465,16 @@ class LucarioPolicy:
             return W["retreat_base"] - (energy_cost * 1500)
         if option.type == OptionType.ATTACK:
             base = W["attack_base"]
-            # FIX: Replay analysis found 174 cases of attack being skipped when Lucario
-            # was ready. Boost attack score massively when Mega Lucario has 2+ energies
-            # so it always executes last (highest priority = plays last = ends turn correctly).
+            # REVERTED: Replay analyzer falsely flagged "Attach" and "Play" as skipped attacks.
+            # Adding +40k to Attack forced the agent to end its turn immediately, skipping all
+            # setups. We leave Attack base at 1000 so it executes AFTER all Plays/Attaches (2000+).
             active_list = self.me.active or []
             if active_list:
                 active_poke = active_list[0]
                 if (active_poke.id == C.MEGA_LUCARIO_EX
                         and len(active_poke.energies) >= 2
                         and plan.attacker == 0):
-                    base += 40_000
+                    base += 500  # Slight bump to firmly beat End Turn/Retreat, but stay under Items (3000+)
 
             # Scale attack urgency when behind on prizes
             my_prizes = self.my_prizes_left
@@ -608,18 +608,18 @@ class LucarioPolicy:
                 return -1
             if self._low_deck():
                 return -1
-            # Carmine draws 8 after discard — better with larger hand
+            # Carmine discards hand and draws 5 — penalize if discarding a large hand
             hand_size = len(self.me.hand)
-            if hand_size >= 5:
-                return W["play_carmine"] + (hand_size - 4) * 400
+            if hand_size >= 4:
+                return W["play_carmine"] - (hand_size - 3) * 500
             return W["play_carmine"]
         if card.id == C.LILLIE_DETERMINATION:
             if self._low_deck():
                 return -1
-            # Lillie draws to 3 cards — penalize if hand is already big
+            # Lillie draws to X cards (often 3 or 4) — penalize if hand is already big
             hand_size = len(self.me.hand)
-            if hand_size >= 6:
-                return W["play_lillie"] - (hand_size - 5) * 600
+            if hand_size >= 4:
+                return W["play_lillie"] - (hand_size - 3) * 500
             return W["play_lillie"]
         if card.id == C.GRAVITY_MOUNTAIN:
             return self._score_gravity_mountain()

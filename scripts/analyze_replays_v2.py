@@ -143,16 +143,17 @@ def analyze(path):
                     attack_opts = [o for o in opts if o.get("type") == "Attack"]
                     if not attack_opts:
                         pass  # no attack available, fine
-                    # If selected action was NOT an attack, flag it
+                    # If selected action was End Turn / Retreat when we could have attacked
                     elif selected is not None:
                         chosen_idx = selected[0] if selected else None
                         if chosen_idx is not None and chosen_idx < len(opts):
                             chosen_type = opts[chosen_idx].get("type", "")
-                            if chosen_type != "Attack":
+                            # Only flag if we actually ended the turn (Retreat, NO/End Turn)
+                            if chosen_type in ["Retreat", "NO", ""]:
                                 misplays.append({
                                     "turn": turn, "type": "ATTACK_SKIPPED",
                                     "detail": f"Mega Lucario had {active_energies} energies, "
-                                              f"attack options available, but played {chosen_type} instead of attacking!"
+                                              f"attack options available, but chose to End Turn / {chosen_type} instead of attacking!"
                                 })
 
                 # 6. Carmine / Lillie when hand is already big
@@ -176,31 +177,35 @@ def analyze(path):
 
 
 def run_all():
-    replay_files = [
-        r"c:\Users\Rahul\Downloads\90325711.json",
-        r"c:\Users\Rahul\Downloads\90326480.json",
-        r"c:\Users\Rahul\Downloads\90327198.json",
-        r"c:\Users\Rahul\Downloads\90327934.json",
-        r"c:\Users\Rahul\Downloads\90328692.json",
-        r"c:\Users\Rahul\Downloads\90329453.json",
-        r"c:\Users\Rahul\Downloads\90330177.json",
-        r"c:\Users\Rahul\Downloads\90330914.json",
-        r"c:\Users\Rahul\Downloads\90331637.json",
-        r"c:\Users\Rahul\Downloads\90332382.json",
-        r"c:\Users\Rahul\Downloads\90333196.json",
-        r"c:\Users\Rahul\Downloads\90334612.json",
-        r"c:\Users\Rahul\Downloads\90333878.json",
-        r"c:\Users\Rahul\Downloads\90335361.json",
-        r"c:\Users\Rahul\Downloads\90336109.json",
-        r"c:\Users\Rahul\Downloads\90336934.json",
-        r"c:\Users\Rahul\Downloads\90337471.json",
-        r"c:\Users\Rahul\Downloads\90338348.json",
-        r"c:\Users\Rahul\Downloads\90339088.json",
-        r"c:\Users\Rahul\Downloads\90339837.json",
-        r"c:\Users\Rahul\Downloads\90340591.json",
-        r"c:\Users\Rahul\Downloads\90341363.json",
-        r"c:\Users\Rahul\Downloads\90353990.json",
-    ]
+    import sys
+    if len(sys.argv) > 1:
+        replay_files = sys.argv[1:]
+    else:
+        replay_files = [
+            r"c:\Users\Rahul\Downloads\90325711.json",
+            r"c:\Users\Rahul\Downloads\90326480.json",
+            r"c:\Users\Rahul\Downloads\90327198.json",
+            r"c:\Users\Rahul\Downloads\90327934.json",
+            r"c:\Users\Rahul\Downloads\90328692.json",
+            r"c:\Users\Rahul\Downloads\90329453.json",
+            r"c:\Users\Rahul\Downloads\90330177.json",
+            r"c:\Users\Rahul\Downloads\90330914.json",
+            r"c:\Users\Rahul\Downloads\90331637.json",
+            r"c:\Users\Rahul\Downloads\90332382.json",
+            r"c:\Users\Rahul\Downloads\90333196.json",
+            r"c:\Users\Rahul\Downloads\90334612.json",
+            r"c:\Users\Rahul\Downloads\90333878.json",
+            r"c:\Users\Rahul\Downloads\90335361.json",
+            r"c:\Users\Rahul\Downloads\90336109.json",
+            r"c:\Users\Rahul\Downloads\90336934.json",
+            r"c:\Users\Rahul\Downloads\90337471.json",
+            r"c:\Users\Rahul\Downloads\90338348.json",
+            r"c:\Users\Rahul\Downloads\90339088.json",
+            r"c:\Users\Rahul\Downloads\90339837.json",
+            r"c:\Users\Rahul\Downloads\90340591.json",
+            r"c:\Users\Rahul\Downloads\90341363.json",
+            r"c:\Users\Rahul\Downloads\90353990.json",
+        ]
 
     agg = defaultdict(list)
     wins, losses = 0, 0
