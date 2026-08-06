@@ -78,6 +78,13 @@ else:
 model = MyModel(128, 2, 256, 1, 1)
 model = model.to(device)
 
+# --- Resume from checkpoint if it exists ---
+if os.path.exists("model_latest.pth"):
+    print("[INFO] Found model_latest.pth! Resuming training from previous checkpoint.")
+    model.load_state_dict(torch.load("model_latest.pth", map_location=device))
+else:
+    print("[INFO] No checkpoint found. Starting training with random weights.")
+
 # torch.compile gives ~15-30% speedup on Ampere for free (PyTorch 2.0+)
 if device.type == "cuda":
     # Triton (required for torch.compile inductor backend) is not supported natively on Windows

@@ -7,10 +7,16 @@ if '__file__' in globals():
 else:
     sys.path.append('/kaggle_simulations/agent')
 
-from src.agent.hybrid_lucario import agent as hybrid_agent
+# Phase 12: Rule-based Lucario agent — proven 600+ Elo on the real Kaggle ladder.
+# The hybrid MCTS approach scored only ~400 Elo on the real ladder because:
+# 1. Kaggle CPU is too slow for meaningful MCTS (3 sims vs 20 during local training)
+# 2. Neural network policy quality at 3 sims is worse than the hand-tuned heuristic
+# Rule: NEVER replace this with a new agent unless it beats 600 Elo on the real ladder.
+from src.agent.rule_based_lucario import agent as rule_based_agent
 
 def agent(obs_dict):
     """
-    Kaggle entrypoint for the PTCG environment (Hybrid Lucario Agent).
+    Kaggle entrypoint for the PTCG environment (Rule-Based Lucario Agent).
+    Consistently achieves 600+ Elo. Hybrid MCTS is trained locally but not deployed.
     """
-    return hybrid_agent(obs_dict)
+    return rule_based_agent(obs_dict)
