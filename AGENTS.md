@@ -60,8 +60,8 @@ outside the project — it's subject to competition rules.
   imports + a saved/selected agent.
 - Reward-shaping changes go only in `src/env/reward.py`.
 - Run `scripts/validate_submission.sh` before every Kaggle upload.
-- Log every real submission in `eval/ladder_log.md` (date, agent version, deck, 
-  real ladder μ/Elo, notes).
+- **Submission Versioning:** Every submission MUST be archived as a versioned tarball (e.g., `v17.tar.gz` and `submissions/v17.tar.gz`) alongside `submission.tar.gz`.
+- Log every real submission in `eval/ladder_log.md` (date, version name, deck, real ladder μ/Elo, notes).
 - Log local-sim vs real-ladder result side by side in `eval/local_vs_ladder.md` 
   for every RL version, given the known mismatch risk.
 - Never promote a Phase 2 agent to `main.py` unless its real ladder score beats 
@@ -81,9 +81,13 @@ runtime. Crashes observed in Phase 2 were **Turn 0 deck-submission bugs**, not m
 
 Phase 12: Pivot to Rule-Based. The Phase 11 PPO approach maxed out around 342.0 Elo, but the hardcoded `rule_based_lucario.py` agent consistently hits 600+ Elo on the real Kaggle ladder. We have abandoned the RL approach.
 
-- **Current Peak (Rule-Based Lucario): 600+**
+- **Current Active Build:** **v17** (`v17.tar.gz` / `submissions/v17.tar.gz`) — Contains 3 Replay Tactical Fixes + 4 Universal Refinements.
+- **Current Peak (Rule-Based Lucario): 936.0** (Active ladder score ~902 / 846 variance range)
 - **Abandoned RL Peak: 342.0**
-- **Next Target:** Upgrade the Lucario heuristic by downloading Kaggle replays, stepping through game states, and explicitly patching edge cases and misplays.
+- **Next Target:** Target 1000+ Elo on Kaggle ladder with v17.
+
+
+
 
 ## Local Hardware Specs
 - CPU: AMD Ryzen 5 5600H (12 logical cores)
