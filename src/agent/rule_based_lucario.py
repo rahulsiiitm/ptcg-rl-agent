@@ -426,15 +426,17 @@ class LucarioPolicy:
             score += 100 if energy_count < 3 else 0
             score -= 50 if self.has_ready_hariyama_line else 0
         elif pokemon.id == C.LUNATONE:
-            score -= 100
+            score -= 2500  # Firmly below Lucario line — don't waste energy here
         elif pokemon.id == C.SOLROCK:
-            score += 20 if energy_count < 1 else -100
+            score += 20 if energy_count < 1 else -2500
         elif pokemon.id in {C.RIOLU, C.MEGA_LUCARIO_EX}:
-            score += 1 if pokemon.id == C.MEGA_LUCARIO_EX else 0
-            score += 100 if energy_count < 3 else 0
-            score -= 50 if self.has_ready_lucario_line else 0
+            # Core win condition — always gets energy first
+            score += 2000
+            score += 500 if pokemon.id == C.MEGA_LUCARIO_EX else 0
+            score += 500 if energy_count < 2 else 0
+            score -= 200 if self.has_ready_lucario_line else 0
             if active and energy_count < 3:
-                score += 200
+                score += 800
         return score
 
     def _score_option(self, option) -> float:
@@ -455,9 +457,34 @@ class LucarioPolicy:
         if option.type == OptionType.ABILITY:
             return self._score_ability(option)
         if option.type == OptionType.RETREAT:
-            return W["retreat_base"] if plan.attacker >= 1 else -1
+            if plan.attacker < 1:
+                return -1
+            # Penalize retreat proportional to attached energy being lost
+            active_list = self.me.active or []
+            energy_cost = len(active_list[0].energies) if active_list and active_list[0] else 0
+            return W["retreat_base"] - (energy_cost * 1500)
         if option.type == OptionType.ATTACK:
             base = W["attack_base"]
+            # FIX: Replay analysis found 174 cases of attack being skipped when Lucario
+            # was ready. Boost attack score massively when Mega Lucario has 2+ energies
+            # so it always executes last (highest priority = plays last = ends turn correctly).
+            active_list = self.me.active or []
+            if active_list:
+                active_poke = active_list[0]
+                if (active_poke.id == C.MEGA_LUCARIO_EX
+                        and len(active_poke.energies) >= 2
+                        and plan.attacker == 0):
+                    base += 40_000
+
+            # Scale attack urgency when behind on prizes
+            my_prizes = self.my_prizes_left
+            op_prizes = len(self.opponent.prize)
+            prize_diff = op_prizes - my_prizes  # Negative means we are trailing
+            if prize_diff < 0:
+                base += abs(prize_diff) * 5_000  # Aggressively push KOs when behind
+            elif prize_diff > 0:
+                base += prize_diff * 1_000
+
             return base + 100 if (option.attackId == MEGA_BRAVE) == (plan.attack_index == 1) else base
         return 0
 
@@ -565,13 +592,35 @@ class LucarioPolicy:
                 return 3050 if can_bridge_draw else -1
             return W["play_premium"]
         if card.id == C.BOSS_ORDERS:
-            return W["play_boss"] if plan.target >= 1 else -1
+            base_boss = W["play_boss"] if plan.target >= 1 else -1
+            # FIX: Replay analysis found 16 cases where Boss Orders was in hand but not
+            # played despite opponent having a low-HP benched target. Dynamically boost
+            # when any opponent bench pokemon is below 40% HP — it's a near-free KO.
+            if base_boss > 0:
+                for op_poke in (self.opponent.bench or []):
+                    if op_poke is not None and op_poke.maxHp > 0:
+                        if op_poke.hp / op_poke.maxHp < 0.4:
+                            base_boss += 47_000  # Force it to top priority
+                            break
+            return base_boss
         if card.id == C.CARMINE:
             if self._should_preserve_hariyama():
                 return -1
-            return -1 if self._low_deck() else W["play_carmine"]
+            if self._low_deck():
+                return -1
+            # Carmine draws 8 after discard — better with larger hand
+            hand_size = len(self.me.hand)
+            if hand_size >= 5:
+                return W["play_carmine"] + (hand_size - 4) * 400
+            return W["play_carmine"]
         if card.id == C.LILLIE_DETERMINATION:
-            return -1 if self._low_deck() else W["play_lillie"]
+            if self._low_deck():
+                return -1
+            # Lillie draws to 3 cards — penalize if hand is already big
+            hand_size = len(self.me.hand)
+            if hand_size >= 6:
+                return W["play_lillie"] - (hand_size - 5) * 600
+            return W["play_lillie"]
         if card.id == C.GRAVITY_MOUNTAIN:
             return self._score_gravity_mountain()
         if card.id in {C.DUSK_BALL, C.POKE_PAD, C.FIGHTING_GONG}:
@@ -619,6 +668,11 @@ class LucarioPolicy:
                 score += 100
             elif pokemon.id == C.MEGA_LUCARIO_EX:
                 score += 200
+                # FIX: Replay analysis found 9 cases where Hero Cape was equipped AFTER
+                # Lucario had already taken heavy damage (50%+ lost). Proactively boost
+                # when Lucario is active and at full/high HP so it gets equipped early.
+                if pokemon.maxHp > 0 and pokemon.hp / pokemon.maxHp > 0.70:
+                    score += 8_000  # Equip early for full HP buffer benefit
             return score
 
         score = self._energy_target_score(pokemon, option.inPlayArea == AreaType.ACTIVE)
