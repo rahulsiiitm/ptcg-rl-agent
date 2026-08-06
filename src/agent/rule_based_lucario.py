@@ -54,7 +54,7 @@ class C:
 
 
 MEGA_BRAVE = 983
-LOW_DECK_COUNT = 10
+LOW_DECK_COUNT = 2
 
 _ABRA_BONUS = 400
 _KADABRA_BONUS = 400
@@ -476,15 +476,6 @@ class LucarioPolicy:
                         and plan.attacker == 0):
                     base += 500  # Slight bump to firmly beat End Turn/Retreat, but stay under Items (3000+)
 
-            # Scale attack urgency when behind on prizes
-            my_prizes = self.my_prizes_left
-            op_prizes = len(self.opponent.prize)
-            prize_diff = op_prizes - my_prizes  # Negative means we are trailing
-            if prize_diff < 0:
-                base += abs(prize_diff) * 5_000  # Aggressively push KOs when behind
-            elif prize_diff > 0:
-                base += prize_diff * 1_000
-
             return base + 100 if (option.attackId == MEGA_BRAVE) == (plan.attack_index == 1) else base
         return 0
 
@@ -593,15 +584,14 @@ class LucarioPolicy:
             return W["play_premium"]
         if card.id == C.BOSS_ORDERS:
             base_boss = W["play_boss"] if plan.target >= 1 else -1
-            # FIX: Replay analysis found 16 cases where Boss Orders was in hand but not
+            # FIX: Replay analysis found cases where Boss Orders was in hand but not
             # played despite opponent having a low-HP benched target. Dynamically boost
             # when any opponent bench pokemon is below 40% HP — it's a near-free KO.
-            if base_boss > 0:
-                for op_poke in (self.opponent.bench or []):
-                    if op_poke is not None and op_poke.maxHp > 0:
-                        if op_poke.hp / op_poke.maxHp < 0.4:
-                            base_boss += 47_000  # Force it to top priority
-                            break
+            for op_poke in (self.opponent.bench or []):
+                if op_poke is not None and op_poke.maxHp > 0:
+                    if op_poke.hp / op_poke.maxHp < 0.4:
+                        base_boss = W["play_boss"] + 47_000  # Force it to top priority
+                        break
             return base_boss
         if card.id == C.CARMINE:
             if self._should_preserve_hariyama():
