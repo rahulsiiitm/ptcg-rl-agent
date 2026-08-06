@@ -26,12 +26,18 @@ NAMES = {
 
 def cn(i): return NAMES.get(i, f"#{i}")
 
-def analyze(path):
-    with open(path, encoding="utf-8") as f:
+def analyze(filepath):
+    with open(filepath, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    teams   = data.get("info", {}).get("TeamNames", ["P0","P1"])
-    rewards = data.get("rewards", [None, None])
+    if isinstance(data, list):
+        steps = data
+        teams = ["P0", "P1"]
+        rewards = [None, None]
+    else:
+        steps = data.get("steps", [])
+        teams = data.get("info", {}).get("TeamNames", ["P0","P1"])
+        rewards = data.get("rewards", [None, None])
 
     # Identify our player
     our_idx = next((i for i,n in enumerate(teams) if "rahul" in n.lower()), 1)
@@ -41,7 +47,6 @@ def analyze(path):
     misplays = []
     total_turns = 0
 
-    steps = data.get("steps", [])
     for step in steps:
         # Try visualize blocks first (have full info)
         for agent_step in step:
@@ -88,11 +93,21 @@ def analyze(path):
                 opp_prizes = len(opp.get("prize") or [])
                 my_prizes = len(me.get("prize") or [])
 
+                # Get chosen action
+                chosen_type = ""
+                opts = sel.get("option") or []
+                if selected is not None:
+                    chosen_idx = selected[0] if selected else None
+                    if chosen_idx is not None and chosen_idx < len(opts):
+                        chosen_type = opts[chosen_idx].get("type", "")
+                
+                is_end_of_turn = chosen_type in ["Attack", "Retreat", "NO", ""]
+
                 # ---- MISPLAY CHECKS ----
 
                 # 1. Energy in hand but not attached (turn > 2, active needs energy)
                 energy_count = hand.count(ENERGY)
-                if energy_count > 0 and not energy_attached and turn > 2:
+                if is_end_of_turn and energy_count > 0 and not energy_attached and turn > 2:
                     if active_energies < 3:
                         misplays.append({
                             "turn": turn, "type": "ENERGY_NOT_ATTACHED",
@@ -101,7 +116,7 @@ def analyze(path):
                         })
 
                 # 2. Boss's Orders: opponent has low-HP bench Pokémon
-                if BOSS_ORDERS in hand and not supp_played:
+                if is_end_of_turn and BOSS_ORDERS in hand and not supp_played:
                     for bp in opp_bench:
                         bp_hp  = bp.get("hp", 9999)
                         bp_max = bp.get("maxHp", 9999)
@@ -116,8 +131,7 @@ def analyze(path):
                             break
 
                 # 3. Hero Cape not equipped to Lucario when Lucario is active and healthy
-                # This is actually good — detect if we wait TOO long (lucario already at <50% HP)
-                if HERO_CAPE in hand and active_id == MEGA_LUCARIO:
+                if is_end_of_turn and HERO_CAPE in hand and active_id == MEGA_LUCARIO:
                     hp_frac = active_hp / max(active_max_hp, 1)
                     if hp_frac < 0.5:
                         misplays.append({
@@ -128,7 +142,7 @@ def analyze(path):
                 # 4. Bench filling: had searcher but bench < 3 and basics available in deck
                 bench_basics = [p for p in bench if p["id"] in {RIOLU, MAKUHITA}]
                 searcher_in_hand = DUSK_BALL in hand or POKE_PAD in hand
-                if searcher_in_hand and len(bench) < 3 and turn > 1:
+                if is_end_of_turn and searcher_in_hand and len(bench) < 3 and turn > 1:
                     misplays.append({
                         "turn": turn, "type": "BENCH_UNDERFILLED",
                         "detail": f"Bench has {len(bench)} Pokémon (only {len(bench_basics)} basics). "
@@ -136,8 +150,6 @@ def analyze(path):
                     })
 
                 # 5. Attacking when Lucario is active with enough energy but turn ended without attack
-                # Hard to detect precisely without knowing what options were taken
-                # Instead: note when we have 2+ energy on Lucario but we're early in prizes
                 if active_id == MEGA_LUCARIO and active_energies >= 2 and my_prizes > 0:
                     opts = sel.get("option") or []
                     attack_opts = [o for o in opts if o.get("type") == "Attack"]
@@ -157,12 +169,10 @@ def analyze(path):
                                 })
 
                 # 6. Carmine / Lillie when hand is already big
-                if (CARMINE in hand or LILLIE in hand) and supp_played and len(hand) >= 5:
-                    supp = "Carmine" if CARMINE in hand else "Lillie"
-                    misplays.append({
-                        "turn": turn, "type": "SUPPORTER_BIG_HAND",
-                        "detail": f"{supp} played with {len(hand)} cards in hand — minimal draw value!"
-                    })
+                # To accurately check this, we must ensure the CHOSEN action was actually Carmine or Lillie
+                if supp_played and len(hand) >= 5 and is_end_of_turn:
+                    pass # We missed the exact step it was played, too hard to track accurately without step history
+
 
                 # 7. Premium Power Pro when Lucario hasn't attacked yet this turn
                 if PREMIUM_POWER in hand and active_id == MEGA_LUCARIO:
