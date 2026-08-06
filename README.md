@@ -22,7 +22,7 @@
     <img src="https://img.shields.io/badge/Gymnasium-RL%20Env-3CBAC0?style=for-the-badge" alt="Gymnasium"/>
   </a>
   <img src="https://img.shields.io/badge/Phase-3%20Scaling-22C55E?style=for-the-badge" alt="Phase 3"/>
-  <img src="https://img.shields.io/badge/Best%20Score-303.6-FFD700?style=for-the-badge&logo=star&logoColor=black" alt="Score"/>
+  <img src="https://img.shields.io/badge/Best%20Score-902.4-FFD700?style=for-the-badge&logo=star&logoColor=black" alt="Score"/>
 </p>
 
 <p align="center">
@@ -40,7 +40,7 @@
 <table>
 <tr>
 <td valign="middle" width="85%">
-This repository houses our pipeline for the Kaggle Pokémon TCG AI Battle Challenge. We initially explored PPO Reinforcement Learning, but discovered that a <strong>highly-tuned Heuristic Rule-Based Agent (Mega Lucario deck)</strong> vastly outperforms the RL policy (600+ Elo vs 300 Elo).
+This repository houses our pipeline for the Kaggle Pokémon TCG AI Battle Challenge. We initially explored PPO Reinforcement Learning, but discovered that a <strong>highly-tuned Heuristic Rule-Based Agent (Mega Lucario deck)</strong> vastly outperforms the RL policy (902+ Elo vs 342 Elo).
 <br><br>
 Rather than attempting to build a generalized bot, our strategic focus is:
 <ol>
@@ -68,7 +68,8 @@ We follow a strict **phase-gated deployment cycle**: a new agent iteration is on
 | **Phase 0** | Complete | — | Deck Mine: Identified optimal, consistent 60-card decks. |
 | **Phase 1** | Complete | **170.1** | Naive Heuristic Baseline (Attack > Evolve > Attach). |
 | **Phase 2-11 (RL)** | Abandoned | **342.0** | PPO + Pure-NumPy inference deployed. Hit a ceiling at ~340 Elo. |
-| **Phase 12 (Pivot)**| **Active** | **600+** | Pivoted to `rule_based_lucario.py`. Using Kaggle replays to identify misplays and patch the heuristic logic for Mega Lucario. |
+| **Phase 12 (Pivot)**| **Active** | **902.4** (Peak **936.0**) | Pivoted to `rule_based_lucario.py`. Using Kaggle replays to identify misplays and patch heuristic logic for Mega Lucario. |
+
 
 Full submission history and local benchmarks → [`eval/ladder_log.md`](eval/ladder_log.md)
 
