@@ -32,8 +32,10 @@
 | 2026-08-05 | `submission.tar.gz` | Phase 12 Rule-Based Baseline | Mega Lucario | **691.3** | 76% (38/50) | Switched entirely to Mega Lucario heuristic. Abandoned RL. |
 | 2026-08-06 | `submission.tar.gz` | Phase 12 Heuristic (Unpatched) | Mega Lucario | **420.3** | N/A | Interim submission before replay-based misplay fixes. |
 | 2026-08-06 | `submission.tar.gz` | **Rule-Based Lucario (Replay-Patched)** | Mega Lucario | **902.4** (Peak **936.0**) | 94% (16/17) | Replay fixes for Attack Priority (+40k), Boss Orders (+47k), and Hero Cape (+8k). |
-| 2026-08-06 | `v17.tar.gz` | **Rule-Based Lucario v17** | Mega Lucario | **774.2** | 50% (5/10) | **CRASHED ELO:** The +40k Attack boost caused the agent to attack instantly and skip playing setups. Supporter math was also flawed. |
-| 2026-08-06 | `v18.tar.gz` | **Rule-Based Lucario v18 (Hotfix)** | Mega Lucario | *Pending Ladder Upload* | 100% | **v18 BUILD:** Removed the +40k attack bug and fixed the Supporter hand-size penalty math. Target: Recover to 1000+ Elo. |
+| 2026-08-06 | `v17.tar.gz` | **Rule-Based Lucario v17** | Mega Lucario | **557.2** | 50% (5/10) | **CRASHED ELO:** The +40k Attack boost caused the agent to attack instantly and skip playing setups. Supporter math was also flawed. |
+| 2026-08-06 | `v18.tar.gz` | **Rule-Based Lucario v18 (Hotfix)** | Mega Lucario | **669.6** | 100% | Hotfix for +40k Attack & Supporter math. Agent recovered partially (50-66% WR) but Prize-Trail bug & Boss's Orders dead-code remained from v17, capping score. |
+| 2026-08-06 | `v19.tar.gz` | **Rule-Based Lucario v19** | Mega Lucario | **958.8** (New Peak!) | 100% | Final v17 bug purge: removed Prize-Trail Aggression to fix `ENERGY_NOT_ATTACHED` and `BENCH_UNDERFILLED`, and fixed `Boss's Orders` target check logic. |
+| 2026-08-06 | `v20.tar.gz` | **Rule-Based Lucario v20** | Mega Lucario | *Pending Ladder Upload* | N/A | Hotfix: Changed `LOW_DECK_COUNT` from `10` to `2` to fix Turn 1 deck search paralysis (enabled Poke Pad, Dusk Ball, Carmine, Lillie). |
 
 
 
