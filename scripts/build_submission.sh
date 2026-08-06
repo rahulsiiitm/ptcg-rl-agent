@@ -9,7 +9,6 @@ tar -czvf submission.tar.gz \
     lucario_w.json \
     src/ \
     cg/ \
-    top20_decks/ \
     data/EN_Card_Data.csv \
     data/card_lookup.py \
     data/__init__.py
