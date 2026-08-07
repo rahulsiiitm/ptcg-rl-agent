@@ -36,8 +36,8 @@
 | 2026-08-06 | `v18.tar.gz` | **Rule-Based Lucario v18 (Hotfix)** | Mega Lucario | **669.6** | 100% | Hotfix for +40k Attack & Supporter math. Agent recovered partially (50-66% WR) but Prize-Trail bug & Boss's Orders dead-code remained from v17, capping score. |
 | 2026-08-06 | `v19.tar.gz` | **Rule-Based Lucario v19** | Mega Lucario | **958.8** (New Peak!) | 100% | Final v17 bug purge: removed Prize-Trail Aggression to fix `ENERGY_NOT_ATTACHED` and `BENCH_UNDERFILLED`, and fixed `Boss's Orders` target check logic. |
 | 2026-08-06 | `v20.tar.gz` | **Rule-Based Lucario v20** | Mega Lucario | *Pending Ladder Upload* | N/A | Hotfix: Changed `LOW_DECK_COUNT` from `10` to `2` to fix Turn 1 deck search paralysis (enabled Poke Pad, Dusk Ball, Carmine, Lillie). |
-
-
+| 2026-08-07 | `v21.tar.gz` | **Rule-Based Lucario v21** | Mega Lucario | **580.0** | 100% | **CRASHED ELO:** Dropped from 796 to 580. Accidental -1000 penalty on `DISCARD` (11) and `YES` (1) broke Trainer items and abilities. |
+| 2026-08-07 | `v22.tar.gz` | **Rule-Based Lucario v22** | Mega Lucario | *Pending Ladder Upload* | Replay audit: 23 unique v21 games | Consolidated post-v21 fix: correct enums/Yes-No handling, retreat/search/TR safeguards, and attachment before Lunar Cycle; rebuilt below Kaggle's size limit. |
 
 ---
 
