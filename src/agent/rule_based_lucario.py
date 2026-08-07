@@ -13,6 +13,7 @@ from cg.api import (
     OptionType,
     Pokemon,
     SelectContext,
+    all_attack,
     all_card_data,
     to_observation_class,
 )
@@ -35,6 +36,19 @@ class C:
     MEGA_LUCARIO_EX = 678
     DWEBBLE = 344
     CRUSTLE = 345
+    DREEPY = 119
+    DRAKLOAK = 120
+    DRAGAPULT_EX = 121
+    TEAL_MASK_OGERPON_EX = 96
+    HYDRAPPLE_EX = 150
+    GRIMMSNARL = 648
+    MEGA_FROSLASS_EX = 861
+    DURALUDON = 169
+    ARCHALUDON_EX = 190
+    RELICANTH = 57
+    AZUMARILL = 315
+    CYNTHIAS_GARCHOMP_EX = 381
+    HOPS_TREVENANT = 879
 
     BASIC_FIGHTING_ENERGY = 6
     DUSK_BALL = 1102
@@ -56,8 +70,9 @@ class C:
 MEGA_BRAVE = 983
 LOW_DECK_COUNT = 2
 
-_ABRA_BONUS = 400
-_KADABRA_BONUS = 400
+_ABRA_BONUS = 1400
+_KADABRA_BONUS = 1400
+_ALAKAZAM_BONUS = 2500
 
 # ---- Tunable priority weights (defaults reproduce the hand-tuned baseline) ----
 # Keys match MUTATE_KEYS in evolve_lucario.py exactly. If you add a new
@@ -102,6 +117,7 @@ with open(DECK_PATH, "r", encoding="utf-8") as f:
 
 all_card = all_card_data()
 card_table = {card.cardId: card for card in all_card}
+attack_table = {attack.attackId: attack for attack in all_attack()}
 
 
 class AttackPlan:
@@ -180,6 +196,8 @@ def target_score(pokemon: Pokemon) -> int:
         score += _ABRA_BONUS
     elif pokemon.id == C.KADABRA:
         score += _KADABRA_BONUS
+    elif pokemon.id == C.ALAKAZAM:
+        score += _ALAKAZAM_BONUS
     if pokemon.id == C.RIOLU:
         score += 800
     elif pokemon.id == C.MEGA_LUCARIO_EX:
@@ -294,6 +312,257 @@ class LucarioPolicy:
             for pokemon in self._opponent_board()
         )
 
+    def _opponent_has_alakazam_axis(self) -> bool:
+        return any(
+            pokemon is not None and pokemon.id in {C.ABRA, C.KADABRA, C.ALAKAZAM}
+            for pokemon in self._opponent_board()
+        )
+
+    def _static_counterattack_damage(self, attacker: Pokemon, defender: Pokemon | None) -> int:
+        """Best printed attack damage reachable after one normal attachment."""
+        attacker_data = card_table.get(attacker.id)
+        if attacker_data is None:
+            return 0
+        available_energy = len(attacker.energies) + 1
+        damage = 0
+        for attack_id in attacker_data.attacks:
+            attack = attack_table.get(attack_id)
+            if attack is None or len(attack.energies) > available_energy:
+                continue
+            candidate = max(0, attack.damage)
+            if defender is not None and candidate > 0:
+                defender_data = card_table.get(defender.id)
+                if defender_data is not None:
+                    if defender_data.weakness == attacker_data.energyType:
+                        candidate *= 2
+                    elif defender_data.resistance == attacker_data.energyType:
+                        candidate = max(0, candidate - 30)
+            damage = max(damage, candidate)
+        return damage
+
+    def _visible_counterattack_damage(
+        self,
+        defender: Pokemon | None = None,
+        attacker: Pokemon | None = None,
+    ) -> int:
+        """Conservative damage floor for the opponent's visible active attacker.
+
+        This deliberately uses only public board/hand-count information.  It is
+        not a full opponent simulator; it catches the replay-proven attacks that
+        can immediately end the game if we leave a multi-prize Pokemon active.
+        """
+        if attacker is None:
+            if not self.opponent.active or self.opponent.active[0] is None:
+                return 0
+            attacker = self.opponent.active[0]
+        if defender is None:
+            defender = self.me.active[0] if self.me.active else None
+        energy = len(attacker.energies)
+        damage = self._static_counterattack_damage(attacker, defender)
+        # Include the opponent's normal attachment next turn.  The v19 batch
+        # contains several losses where a one-Energy attacker became lethal
+        # immediately after we committed to an attack.
+        if attacker.id == C.DRAGAPULT_EX and energy >= 1:
+            return max(damage, 200)
+        if attacker.id == C.TEAL_MASK_OGERPON_EX and energy >= 1:
+            if defender is None:
+                defender = self.me.active[0] if self.me.active else None
+            my_energy = len(defender.energies) if defender is not None else 0
+            return max(damage, 30 + 30 * (energy + my_energy))
+        if attacker.id == C.HYDRAPPLE_EX and energy >= 1:
+            visible_energy = sum(
+                len(pokemon.energies)
+                for pokemon in self._opponent_board()
+                if pokemon is not None
+            )
+            return max(damage, 30 + 30 * visible_energy)
+        if attacker.id == C.MEGA_LUCARIO_EX and energy >= 1:
+            return max(damage, 270)
+        if attacker.id == C.MEGA_FROSLASS_EX:
+            damage = 50 * len(self.me.hand)
+            return max(damage, 150 if energy >= 2 else 0)
+        if attacker.id == C.GRIMMSNARL and energy >= 1:
+            return max(damage, 180)
+        if attacker.id == C.CRUSTLE and energy >= 2:
+            return max(damage, 120)
+        if attacker.id == C.ALAKAZAM:
+            return max(damage, 20 * (getattr(self.opponent, "handCount", 0) or 0))
+        if attacker.id == C.ARCHALUDON_EX and energy >= 2:
+            damage = 220
+            relicanth_visible = any(
+                pokemon is not None and pokemon.id == C.RELICANTH
+                for pokemon in self._opponent_board()
+            )
+            if relicanth_visible:
+                damage = max(damage, 80 + max(0, attacker.maxHp - attacker.hp))
+            return damage
+        if attacker.id == C.AZUMARILL and energy >= 0:
+            tera_visible = any(
+                pokemon is not None and card_table[pokemon.id].tera
+                for pokemon in self._opponent_board()
+            )
+            if tera_visible:
+                double_edge = 230
+                if defender is not None:
+                    defender_data = card_table.get(defender.id)
+                    attacker_data = card_table.get(attacker.id)
+                    if (defender_data is not None and attacker_data is not None
+                            and defender_data.weakness == attacker_data.energyType):
+                        double_edge *= 2
+                    elif (defender_data is not None and attacker_data is not None
+                            and defender_data.resistance == attacker_data.energyType):
+                        double_edge = max(0, double_edge - 30)
+                damage = max(damage, double_edge)
+        if attacker.id == C.HOPS_TREVENANT:
+            # Horrifying Revenge reaches 130 after one of Hop's Pokemon was KO'd.
+            damage = max(damage, 130)
+        return damage
+
+    @staticmethod
+    def _dragapult_spread_prizes(bench: list[Pokemon | None]) -> int:
+        """Maximum visible Bench prizes Dragapult can take with 60 damage."""
+        choices = [(pokemon.hp, prize_count(pokemon)) for pokemon in bench
+                   if pokemon is not None and 0 < pokemon.hp <= 60]
+        best = [0] * 61
+        for hp, prizes in choices:
+            for budget in range(60, hp - 1, -1):
+                best[budget] = max(best[budget], best[budget - hp] + prizes)
+        return max(best)
+
+    @staticmethod
+    def _attack_reachable_after_attachment(attacker: Pokemon, attack_name: str) -> bool:
+        """Whether a named printed attack is reachable with one normal attach."""
+        data = card_table.get(attacker.id)
+        if data is None:
+            return False
+        available_energy = len(attacker.energies) + 1
+        return any(
+            attack is not None
+            and attack.name == attack_name
+            and len(attack.energies) <= available_energy
+            for attack in (attack_table.get(attack_id) for attack_id in data.attacks)
+        )
+
+    def _visible_spread_prizes(
+        self,
+        attacker: Pokemon,
+        bench: list[Pokemon | None],
+    ) -> int:
+        """Visible Bench prizes a reachable attack can take next turn."""
+        if (attacker.id == C.DRAGAPULT_EX
+                and self._attack_reachable_after_attachment(attacker, "Phantom Dive")):
+            return self._dragapult_spread_prizes(bench)
+        if (attacker.id == C.GRIMMSNARL
+                and self._attack_reachable_after_attachment(attacker, "Shadow Bullet")):
+            return max(
+                (prize_count(pokemon) for pokemon in bench
+                 if pokemon is not None and 0 < pokemon.hp <= 30),
+                default=0,
+            )
+        return 0
+
+    def _threatened_prizes(
+        self,
+        active: Pokemon | None = None,
+        bench: list[Pokemon | None] | None = None,
+    ) -> int:
+        if active is None:
+            active = self.me.active[0] if self.me.active else None
+        if active is None:
+            return 0
+        damage = self._visible_counterattack_damage(active)
+        prizes = prize_count(active) if damage >= active.hp else 0
+        opponent_active = self.opponent.active[0] if self.opponent.active else None
+        if opponent_active is not None:
+            prizes += self._visible_spread_prizes(
+                opponent_active,
+                list(self.me.bench if bench is None else bench),
+            )
+        return prizes
+
+    def _successor_threatened_prizes(self, active: Pokemon | None = None) -> int:
+        """Worst visible Bench attacker after we KO the opponent's Active."""
+        if active is None:
+            active = self.me.active[0] if self.me.active else None
+        if active is None:
+            return 0
+        threats = []
+        for attacker in self.opponent.bench:
+            if attacker is None:
+                continue
+            prizes = (
+                prize_count(active)
+                if self._visible_counterattack_damage(active, attacker) >= active.hp
+                else 0
+            )
+            prizes += self._visible_spread_prizes(attacker, list(self.me.bench))
+            threats.append(prizes)
+        return max(threats, default=0)
+
+    def _opponent_has_terminal_threat(self) -> bool:
+        return self._threatened_prizes() >= len(self.opponent.prize)
+
+    def _safe_pivot_indices(self) -> list[int]:
+        if not self.me.active:
+            return []
+        safe = []
+        for index, candidate in enumerate(self.me.bench):
+            if candidate is None:
+                continue
+            if self._pivot_threatened_prizes(index) < len(self.opponent.prize):
+                safe.append(index)
+        return safe
+
+    def _pivot_threatened_prizes(self, bench_index: int) -> int:
+        if not self.me.active or not 0 <= bench_index < len(self.me.bench):
+            return 0
+        candidate = self.me.bench[bench_index]
+        if candidate is None:
+            return 0
+        future_bench = [self.me.active[0]] + [
+            pokemon for other_index, pokemon in enumerate(self.me.bench)
+            if other_index != bench_index
+        ]
+        return self._threatened_prizes(candidate, future_bench)
+
+    def _planned_immediate_win(self) -> bool:
+        if plan.attacker < 0 or plan.target < 0 or plan.remain_hp > 0:
+            return False
+        board = self._opponent_board()
+        return (
+            plan.target < len(board)
+            and board[plan.target] is not None
+            and prize_count(board[plan.target]) >= self.my_prizes_left
+        )
+
+    def _planned_removes_active_threat(self) -> bool:
+        """A forced KO is defense too; do not retreat away from it.
+
+        This is essential against Alakazam and Dragapult.  v19 repeatedly had
+        a lethal attack available but either used nonlethal Aura Jab or tried
+        to hide a Mega that Boss's Orders could simply bring back.
+        """
+        return (
+            plan.attacker == 0
+            and plan.target == 0
+            and plan.remain_hp <= 0
+            and self._visible_counterattack_damage() > 0
+            and self._successor_threatened_prizes() < len(self.opponent.prize)
+        )
+
+    def terminal_defense_required(self) -> bool:
+        successor_terminal = (
+            plan.attacker == 0
+            and plan.target == 0
+            and plan.remain_hp <= 0
+            and self._successor_threatened_prizes() >= len(self.opponent.prize)
+        )
+        return (
+            (self._opponent_has_terminal_threat() or successor_terminal)
+            and not self._planned_immediate_win()
+            and not self._planned_removes_active_threat()
+        )
+
     def _should_preserve_hariyama(self) -> bool:
         return (
             self._opponent_has_crustle_axis()
@@ -403,11 +672,16 @@ class LucarioPolicy:
                     prize = prize_count(op_pokemon) if op_pokemon.hp <= damage else 0
                     if prize == 0:
                         score *= damage / op_pokemon.hp
-                    else:
-                        score += 50000 * prize  # GUARANTEED PRIZE IS HUGE
-
-                    if len(self.opponent.prize) <= prize:
-                        score += 500000
+                    elif op_pokemon.id == C.ALAKAZAM:
+                        # Two v19 losses contain confirmed nonlethal Aura Jabs
+                        # with a legal lethal Mega Brave; nine more loss turns
+                        # chose Aura with Brave available. Powerful Hand then
+                        # frequently took three prizes from the exposed Mega.
+                        # Reward the KO only for this must-remove attacker,
+                        # rather than restoring v22's global prize greed.
+                        score += 2500
+                    if self.my_prizes_left <= prize:
+                        score = 200000
 
                     score += base_score
                     score += 220 if attacker_index == 0 else 0
@@ -444,11 +718,58 @@ class LucarioPolicy:
             score -= 200 if self.has_ready_lucario_line else 0
             if active and energy_count < 3:
                 score += 800
+        if self._opponent_has_crustle_axis():
+            # Crustle prevents damage from Pokemon ex.  Replays showed six or
+            # more Energies stranded on Lucario while the non-ex attackers
+            # remained unusable, so build the actual outs first.
+            if pokemon.id in {C.MAKUHITA, C.HARIYAMA} and energy_count < 3:
+                score += 4500
+            elif pokemon.id == C.SOLROCK and energy_count < 1:
+                score += 4000
+            elif pokemon.id == C.MEGA_LUCARIO_EX:
+                score -= 5500
+        if self._opponent_has_alakazam_axis():
+            # Alakazam turns a large hand into enough counters to one-shot a
+            # Mega.  Develop single-prize attackers and charge Riolu before
+            # exposing the three-prize evolution.
+            if pokemon.id in {C.MAKUHITA, C.HARIYAMA} and energy_count < 3:
+                score += 7000
+            elif pokemon.id == C.RIOLU and energy_count < 2:
+                score += 3500
+            elif pokemon.id == C.MEGA_LUCARIO_EX and energy_count < 2:
+                score += 2500
         return score
+
+    def _hariyama_gust_target(self) -> int | None:
+        """Opponent Bench index to gust, including a defensive stall target."""
+        if plan.target >= 1:
+            target = plan.target - 1
+            if 0 <= target < len(self.opponent.bench) and self.opponent.bench[target] is not None:
+                return target
+
+        active = self.me.active[0] if self.me.active else None
+        opponent_active = self.opponent.active[0] if self.opponent.active else None
+        if active is None or opponent_active is None:
+            return None
+
+        current_damage = self._visible_counterattack_damage(active, opponent_active)
+        if current_damage < active.hp:
+            return None
+
+        candidates = []
+        for index, candidate in enumerate(self.opponent.bench):
+            if candidate is None:
+                continue
+            damage = self._visible_counterattack_damage(active, candidate)
+            candidates.append((damage, target_score(candidate), index))
+        if not candidates:
+            return None
+        damage, _, index = min(candidates)
+        return index if damage < current_damage else None
 
     def _score_option(self, option) -> float:
         if getattr(option, "type", -1) == OptionType.END:
-            return -1000
+            return 0
         if option.type == OptionType.NUMBER:
             return option.number
         if option.type == OptionType.YES:
@@ -458,13 +779,13 @@ class LucarioPolicy:
                 # If Hariyama's ability prompts to Gust, only say YES if we plan to attack the Bench
                 effect_card = self.select.effect or self.select.contextCard
                 if effect_card and effect_card.id == C.HARIYAMA:
-                    return 100 if plan.target > 0 else -1
+                    return 100 if self._hariyama_gust_target() is not None else -100
             return 1
         if option.type == OptionType.NO:
             if self.context == SelectContext.ACTIVATE:
                 effect_card = self.select.effect or self.select.contextCard
                 if effect_card and effect_card.id == C.HARIYAMA:
-                    return 100 if plan.target == 0 else -1
+                    return 100 if self._hariyama_gust_target() is None else -100
             return 0
         if option.type == OptionType.CARD:
             return self._score_card_choice(option)
@@ -477,10 +798,16 @@ class LucarioPolicy:
         if option.type == OptionType.ABILITY:
             return self._score_ability(option)
         if option.type == OptionType.RETREAT:
-            if plan.attacker == 0:
-                return -1000
-            return W["play_switch"]
+            if self.terminal_defense_required() and self._safe_pivot_indices():
+                return 100000
+            if plan.attacker < 1:
+                return -1
+            active = self.me.active[0] if self.me.active else None
+            energy_cost = len(active.energies) if active is not None else 0
+            return W["retreat_base"] - energy_cost * 1500
         if option.type == OptionType.ATTACK:
+            if self._planned_immediate_win() and plan.attacker == 0 and plan.target == 0:
+                return 200000
             base = W["attack_base"]
             # REVERTED: Replay analyzer falsely flagged "Attach" and "Play" as skipped attacks.
             # Adding +40k to Attack forced the agent to end its turn immediately, skipping all
@@ -524,7 +851,32 @@ class LucarioPolicy:
         # -------------------------------
 
         if option.playerIndex != self.my_index:
-            return 100 if option.index == plan.target - 1 else 0
+            gust_target = self._hariyama_gust_target()
+            return 100 if gust_target is not None and option.index == gust_target else 0
+
+        if self.context == SelectContext.TO_ACTIVE and (
+            not self.me.active or self.me.active[0] is None
+        ):
+            future_bench = [
+                pokemon for index, pokemon in enumerate(self.me.bench)
+                if index != option.index
+            ]
+            threatened = self._threatened_prizes(card, future_bench)
+            if threatened >= len(self.opponent.prize):
+                return -10000 - prize_count(card) * 1000
+
+        if self.terminal_defense_required():
+            safe = self._safe_pivot_indices()
+            if option.index in safe:
+                # Prefer a single-prize, healthy wall.  This specifically stops
+                # Switch from promoting an uncharged three-prize Lucario.
+                return 10000 - prize_count(card) * 1000 + card.hp
+            return -10000
+
+        if (option.index == plan.attacker - 1
+                and self._pivot_threatened_prizes(option.index) >= len(self.opponent.prize)
+                and not self._planned_immediate_win()):
+            return -10000
 
         score = len(card.energies) * 20
         if option.index == plan.attacker - 1:
@@ -582,10 +934,27 @@ class LucarioPolicy:
             return -1
         if card.id == C.RIOLU and self.field_counts[C.RIOLU] + self.field_counts[C.MEGA_LUCARIO_EX] >= 2:
             return -1
+        dragapult_online = any(
+            pokemon is not None and pokemon.id == C.DRAGAPULT_EX
+            and len(pokemon.energies) >= 2
+            for pokemon in self._opponent_board()
+        )
+        if (dragapult_online and len(self.opponent.prize) <= 3
+                and card.id in {C.MAKUHITA, C.RIOLU}
+                and self.field_counts[card.id] >= 1):
+            return -1
         return score
 
     def _score_play_trainer(self, card: Card) -> float:
         if card.id == C.SWITCH:
+            if self.terminal_defense_required() and self._safe_pivot_indices():
+                return 100000
+            if self._planned_immediate_win() and plan.attacker > 0:
+                return 150000
+            if (plan.attacker > 0
+                    and self._pivot_threatened_prizes(plan.attacker - 1)
+                    >= len(self.opponent.prize)):
+                return -1
             return W["play_switch"] if plan.attacker > 0 else -1
         if card.id == C.PREMIUM_POWER_PRO:
             if self.state.supporterPlayed and plan.remain_hp <= 0:
@@ -600,6 +969,8 @@ class LucarioPolicy:
                 return 3050 if can_bridge_draw else -1
             return W["play_premium"]
         if card.id == C.BOSS_ORDERS:
+            if self._planned_immediate_win() and plan.target >= 1:
+                return 150000
             return W["play_boss"] if plan.target >= 1 else -1
         if card.id == C.CARMINE:
             if self._should_preserve_hariyama():
@@ -661,6 +1032,18 @@ class LucarioPolicy:
         safe_draws = self.me.deckCount - self.my_prizes_left - 1
         return safe_draws < LOW_DECK_COUNT
 
+    def _attachment_enables_safe_retreat(self, pokemon: Pokemon) -> bool:
+        """True when one Energy unlocks retreat into a non-terminal pivot."""
+        if getattr(self.me, "asleep", False) or getattr(self.me, "paralyzed", False):
+            return False
+        if not self._safe_pivot_indices():
+            return False
+        data = card_table.get(pokemon.id)
+        if data is None:
+            return False
+        attached = len(pokemon.energies)
+        return attached < data.retreatCost <= attached + 1
+
     def _score_attach(self, option) -> float:
         card = get_card(self.obs, AreaType.HAND, option.index, self.my_index)
         pokemon = get_card(self.obs, option.inPlayArea, option.inPlayIndex, self.my_index)
@@ -685,10 +1068,26 @@ class LucarioPolicy:
                     score += 8_000  # Equip early for full HP buffer benefit
             return score
 
+        enables_safe_retreat = (
+            option.inPlayArea == AreaType.ACTIVE
+            and self.terminal_defense_required()
+            and self._attachment_enables_safe_retreat(pokemon)
+        )
+        if (option.inPlayArea == AreaType.ACTIVE
+                and self.terminal_defense_required()
+                and not self._planned_immediate_win()
+                and not enables_safe_retreat):
+            return -1
+
         score = self._energy_target_score(pokemon, option.inPlayArea == AreaType.ACTIVE)
         board_index = option.inPlayIndex if option.inPlayArea == AreaType.ACTIVE else option.inPlayIndex + 1
         if board_index == plan.attacker and plan.needs_energy:
-            score += 5000  # Put it firmly at ~16,800, safely below abilities/basics, but high priority
+            # A planned KO/escape must beat generic Lucario development.  In
+            # 90689606 the old +200 still sent the only Energy to Riolu and
+            # left an uncharged Solrock trapped in the Active Spot.
+            score += 50000
+        if enables_safe_retreat:
+            score += 120000
         return score
 
     @staticmethod
@@ -738,16 +1137,69 @@ class LucarioPolicy:
     def must_attach_before_lunar_cycle(self) -> bool:
         return bool(self._lunar_cycle_blocking_attach_options())
 
+    def _hand_reset_available(self) -> bool:
+        for option in getattr(getattr(self, "select", None), "option", []):
+            if option.type != OptionType.PLAY:
+                continue
+            card = get_card(self.obs, AreaType.HAND, option.index, self.my_index)
+            if card is not None and card.id in {C.CARMINE, C.LILLIE_DETERMINATION}:
+                return True
+        return False
+
+    def _mega_evolution_survives_visible_attack(self, riolu: Pokemon) -> bool:
+        """Keep a safe Mega before a hand reset would discard/shuffle it."""
+        riolu_data = card_table.get(C.RIOLU)
+        mega_data = card_table.get(C.MEGA_LUCARIO_EX)
+        if riolu_data is None or mega_data is None:
+            return False
+        tool_hp_bonus = max(0, riolu.maxHp - riolu_data.hp)
+        damage_taken = max(0, riolu.maxHp - riolu.hp)
+        future_max_hp = mega_data.hp + tool_hp_bonus
+        future_hp = max(1, future_max_hp - damage_taken)
+        evolved = Pokemon(
+            id=C.MEGA_LUCARIO_EX,
+            serial=riolu.serial,
+            hp=future_hp,
+            maxHp=future_max_hp,
+            appearThisTurn=riolu.appearThisTurn,
+            energies=riolu.energies,
+            energyCards=riolu.energyCards,
+            tools=riolu.tools,
+            preEvolution=riolu.preEvolution,
+        )
+        return self._visible_counterattack_damage(evolved) < evolved.hp
+
     def _score_evolve(self, option) -> float:
         pokemon = get_card(self.obs, option.inPlayArea, option.inPlayIndex, self.my_index)
         if not isinstance(pokemon, Pokemon):
             return 0
         evolved = get_card(self.obs, option.area, option.index, self.my_index)
         board_index = option.inPlayIndex if option.inPlayArea == AreaType.ACTIVE else option.inPlayIndex + 1
+        if (evolved is not None and evolved.id == C.HARIYAMA
+                and self._opponent_has_alakazam_axis()):
+            return 20000 + len(pokemon.energies)
+        if (evolved is not None and evolved.id == C.MEGA_LUCARIO_EX
+                and self._opponent_has_alakazam_axis()):
+            attack_ready = len(pokemon.energies) >= 2 and board_index == plan.attacker
+            preserve_before_reset = (
+                self._hand_reset_available()
+                and self._mega_evolution_survives_visible_attack(pokemon)
+            )
+            if not attack_ready and not preserve_before_reset:
+                return -1
+            if preserve_before_reset:
+                return 25000 + len(pokemon.energies)
         if pokemon.id == C.MAKUHITA and plan.target == 0 and not (
             evolved is not None and evolved.id == C.HARIYAMA and board_index == plan.attacker
         ):
             return -1
+        dragapult_online = any(
+            candidate is not None and candidate.id == C.DRAGAPULT_EX
+            and len(candidate.energies) >= 2
+            for candidate in self._opponent_board()
+        )
+        if dragapult_online and pokemon.hp <= 60 and pokemon.id in {C.MAKUHITA, C.RIOLU}:
+            return 20000 + len(pokemon.energies)
         return W["evolve_base"] + len(pokemon.energies)
 
     def _score_ability(self, option) -> float:
@@ -993,16 +1445,28 @@ def _leaf_eval(state, me_i):
     )
 
 
-def _rollout_pick(obs):
-    """Greedy pick used inside search rollouts (both our own continued turn
-    and the opponent's simulated replies) — just the heuristic top choice."""
+def _rollout_rank(obs, limit):
+    """Rank rollout actions without leaking the simulated global AttackPlan."""
+    global plan
+    real_plan = plan
     try:
-        ranked, _ = LucarioPolicy(obs).rank_and_scores()
-    except Exception:
-        n = len(getattr(obs.select, "option", []) or [])
-        ranked = list(range(n))
-    k = min(getattr(obs.select, "maxCount", 1) or 1, len(ranked)) if ranked else 0
+        try:
+            ranked, _ = LucarioPolicy(obs).rank_and_scores()
+        except Exception:
+            n = len(getattr(obs.select, "option", []) or [])
+            ranked = list(range(n))
+    finally:
+        # Rollout policies call _plan_attack(), which writes the module-global
+        # plan.  Restore the actual turn's plan before resolving real prompts.
+        plan = real_plan
+    k = min(max(0, limit), len(ranked)) if ranked else 0
     return ranked[:k] if k else []
+
+
+def _rollout_pick(obs):
+    """Legal greedy selection used to complete rollout selection prompts."""
+    max_count = getattr(obs.select, "maxCount", 1) or 1
+    return _rollout_rank(obs, max_count)
 
 
 def _greedy_complete_turn(sid, cur, owner, deadline):
@@ -1120,7 +1584,9 @@ def _search_decide(obs, base_order, base_scores):
                     n_eval[idx] += 1
                     continue
 
-                op_ch = _rollout_pick(cur)
+                # MAIN options are alternatives, not a multi-select prompt.
+                # Rank up to K_OPP replies for the minimizing opponent branch.
+                op_ch = _rollout_rank(cur, K_OPP)
                 worst = None
                 for k in range(min(K_OPP, len(op_ch))):
                     if time.monotonic() > deadline:
@@ -1201,17 +1667,18 @@ def agent(obs_dict: dict) -> list[int]:
 
         policy = LucarioPolicy(obs)
         ranked, scores = policy.rank_and_scores()
-        policy._remember_lunatone_ability(ranked)
 
         if not ranked:
             return []
 
         if (policy.context == SelectContext.MAIN
-                and not policy.must_attach_before_lunar_cycle()):
+                and not policy.must_attach_before_lunar_cycle()
+                and not policy.terminal_defense_required()):
             override = _search_decide(obs, ranked, scores)
             if override is not None:
                 ranked = [override] + [i for i in ranked if i != override]
 
+        policy._remember_lunatone_ability(ranked)
         return ranked[: policy.select.maxCount]
     except Exception as e:
         import traceback
@@ -1327,7 +1794,7 @@ def agent(obs_dict, configuration=None):
 
                 # Only overwrite `result` (and thus discard the search-layer
                 # pick) if we actually found and boosted Enhanced Hammer.
-                if boosted:
+                if boosted and not policy.terminal_defense_required():
                     n = len(obs.select.option)
                     ranked = sorted(range(n), key=lambda i: scores[i], reverse=True)
                     result = ranked[:obs.select.maxCount]
