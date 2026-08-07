@@ -333,7 +333,11 @@ class LucarioPolicy:
             energy_required = 3
             base_damage = 210
         elif pokemon.id == C.MAKUHITA:
-            return None
+            energy_required = 1
+            base_damage = 10
+        elif pokemon.id == C.RIOLU:
+            energy_required = 1
+            base_damage = 20
         elif pokemon.id == C.SOLROCK and self.field_counts[C.LUNATONE] >= 1:
             energy_required = 1
             base_damage = 70
@@ -399,8 +403,11 @@ class LucarioPolicy:
                     prize = prize_count(op_pokemon) if op_pokemon.hp <= damage else 0
                     if prize == 0:
                         score *= damage / op_pokemon.hp
+                    else:
+                        score += 50000 * prize  # GUARANTEED PRIZE IS HUGE
+
                     if len(self.opponent.prize) <= prize:
-                        score = 50000
+                        score += 500000
 
                     score += base_score
                     score += 220 if attacker_index == 0 else 0
@@ -440,11 +447,24 @@ class LucarioPolicy:
         return score
 
     def _score_option(self, option) -> float:
+        if getattr(option, "type", -1) == OptionType.END:
+            return -1000
         if option.type == OptionType.NUMBER:
             return option.number
         if option.type == OptionType.YES:
-            return 100 if self.context == SelectContext.IS_FIRST else 1
+            if self.context == SelectContext.IS_FIRST:
+                return 100
+            if self.context == SelectContext.ACTIVATE:
+                # If Hariyama's ability prompts to Gust, only say YES if we plan to attack the Bench
+                effect_card = self.select.effect or self.select.contextCard
+                if effect_card and effect_card.id == C.HARIYAMA:
+                    return 100 if plan.target > 0 else -1
+            return 1
         if option.type == OptionType.NO:
+            if self.context == SelectContext.ACTIVATE:
+                effect_card = self.select.effect or self.select.contextCard
+                if effect_card and effect_card.id == C.HARIYAMA:
+                    return 100 if plan.target == 0 else -1
             return 0
         if option.type == OptionType.CARD:
             return self._score_card_choice(option)
@@ -457,12 +477,9 @@ class LucarioPolicy:
         if option.type == OptionType.ABILITY:
             return self._score_ability(option)
         if option.type == OptionType.RETREAT:
-            if plan.attacker < 1:
-                return -1
-            # Penalize retreat proportional to attached energy being lost
-            active_list = self.me.active or []
-            energy_cost = len(active_list[0].energies) if active_list and active_list[0] else 0
-            return W["retreat_base"] - (energy_cost * 1500)
+            if plan.attacker == 0:
+                return -1000
+            return W["play_switch"]
         if option.type == OptionType.ATTACK:
             base = W["attack_base"]
             # REVERTED: Replay analyzer falsely flagged "Attach" and "Play" as skipped attacks.
@@ -583,16 +600,7 @@ class LucarioPolicy:
                 return 3050 if can_bridge_draw else -1
             return W["play_premium"]
         if card.id == C.BOSS_ORDERS:
-            base_boss = W["play_boss"] if plan.target >= 1 else -1
-            # FIX: Replay analysis found cases where Boss Orders was in hand but not
-            # played despite opponent having a low-HP benched target. Dynamically boost
-            # when any opponent bench pokemon is below 40% HP — it's a near-free KO.
-            for op_poke in (self.opponent.bench or []):
-                if op_poke is not None and op_poke.maxHp > 0:
-                    if op_poke.hp / op_poke.maxHp < 0.4:
-                        base_boss = W["play_boss"] + 47_000  # Force it to top priority
-                        break
-            return base_boss
+            return W["play_boss"] if plan.target >= 1 else -1
         if card.id == C.CARMINE:
             if self._should_preserve_hariyama():
                 return -1
@@ -620,7 +628,19 @@ class LucarioPolicy:
     def _score_deck_search(self, card: Card) -> float:
         # Dusk Ball / Poke Pad / Fighting Gong all thin the deck. Never let
         # them outrank other plays unconditionally once deck-out is a risk.
-        is_desperate = self.field_counts[C.MEGA_LUCARIO_EX] == 0 and self.field_counts[C.RIOLU] == 0
+        total_mons = sum(1 for p in self.me.active + self.me.bench if p is not None)
+        # FIX: is_desperate previously only checked the Lucario line
+        # (MEGA_LUCARIO_EX / RIOLU). If that line was dead but the Hariyama
+        # line (MAKUHITA / HARIYAMA) was still alive, _low_deck() would
+        # block deck-thinning cards even though digging for outs was needed.
+        # Now considers both win-condition lines.
+        lucario_line_dead = (
+            self.field_counts[C.MEGA_LUCARIO_EX] == 0 and self.field_counts[C.RIOLU] == 0
+        )
+        hariyama_line_dead = (
+            self.field_counts[C.HARIYAMA] == 0 and self.field_counts[C.MAKUHITA] == 0
+        )
+        is_desperate = (lucario_line_dead and hariyama_line_dead) or (total_mons <= 2)
         if self._low_deck() and not is_desperate:
             return -1
         return W["play_dusk_pad"]
@@ -668,8 +688,55 @@ class LucarioPolicy:
         score = self._energy_target_score(pokemon, option.inPlayArea == AreaType.ACTIVE)
         board_index = option.inPlayIndex if option.inPlayArea == AreaType.ACTIVE else option.inPlayIndex + 1
         if board_index == plan.attacker and plan.needs_energy:
-            score += 200
+            score += 5000  # Put it firmly at ~16,800, safely below abilities/basics, but high priority
         return score
+
+    @staticmethod
+    def _energy_goal(pokemon: Pokemon) -> int:
+        """Useful manual-energy ceiling for the deck's attacking lines."""
+        if pokemon.id in {C.MAKUHITA, C.HARIYAMA}:
+            return 3
+        if pokemon.id in {C.RIOLU, C.MEGA_LUCARIO_EX}:
+            return 2
+        if pokemon.id == C.SOLROCK:
+            return 1
+        return 0
+
+    def _lunar_cycle_blocking_attach_options(self) -> list:
+        """Return manual attachments that must happen before Lunar Cycle.
+
+        Lunar Cycle discards a Fighting Energy from hand as its cost. Replays
+        90611080 and 90612665 show the old 30k ability priority consuming the
+        only Energy before the once-per-turn attachment, leaving an attacker
+        undercharged. Only protect genuinely useful attachments; if every
+        attacker is already at its energy goal, Lunar Cycle may spend it.
+        """
+        if self.context != SelectContext.MAIN or self.state.energyAttached:
+            return []
+        if self.hand_counts[C.BASIC_FIGHTING_ENERGY] <= 0:
+            return []
+
+        has_lunar_cycle = False
+        useful_attaches = []
+        for option in self.select.option:
+            if option.type == OptionType.ABILITY:
+                card = get_card(self.obs, option.area, option.index, self.my_index)
+                if card is not None and card.id == C.LUNATONE:
+                    has_lunar_cycle = True
+            elif option.type == OptionType.ATTACH:
+                card = get_card(self.obs, AreaType.HAND, option.index, self.my_index)
+                pokemon = get_card(
+                    self.obs, option.inPlayArea, option.inPlayIndex, self.my_index
+                )
+                if (card is not None and card.id == C.BASIC_FIGHTING_ENERGY
+                        and isinstance(pokemon, Pokemon)
+                        and len(pokemon.energies) < self._energy_goal(pokemon)):
+                    useful_attaches.append(option)
+
+        return useful_attaches if has_lunar_cycle else []
+
+    def must_attach_before_lunar_cycle(self) -> bool:
+        return bool(self._lunar_cycle_blocking_attach_options())
 
     def _score_evolve(self, option) -> float:
         pokemon = get_card(self.obs, option.inPlayArea, option.inPlayIndex, self.my_index)
@@ -687,8 +754,14 @@ class LucarioPolicy:
         card = get_card(self.obs, option.area, option.index, self.my_index)
         if card.id == C.LUMIOSE_CITY:
             return 1
-        if card.id == C.LUNATONE and self._low_deck():
-            return -1
+        if card.id == C.LUNATONE:
+            if self._low_deck():
+                return -1
+            blocking_attaches = self._lunar_cycle_blocking_attach_options()
+            if blocking_attaches:
+                # Keep the ability available, but put every useful attachment
+                # above it. Search is also gated below so it cannot undo this.
+                return min(self._score_attach(item) for item in blocking_attaches) - 1
         return W["ability_base"]
 
     def _remember_lunatone_ability(self, ranked: list[int]) -> None:
@@ -1133,7 +1206,8 @@ def agent(obs_dict: dict) -> list[int]:
         if not ranked:
             return []
 
-        if policy.context == SelectContext.MAIN:
+        if (policy.context == SelectContext.MAIN
+                and not policy.must_attach_before_lunar_cycle()):
             override = _search_decide(obs, ranked, scores)
             if override is not None:
                 ranked = [override] + [i for i in ranked if i != override]
@@ -1207,7 +1281,8 @@ def agent(obs_dict, configuration=None):
     Layered entry point:
     1. Activate static Grimmsnarl/Dragapult templates when those lines are visible.
     2. Run base Lucario heuristic + 2-ply search.
-    3. If opponent has Team Rocket Energy, boost Enhanced Hammer to top priority.
+    3. If opponent has Team Rocket Energy AND we actually hold Enhanced Hammer,
+       boost Enhanced Hammer to top priority.
     """
     global _TEMPLATE_SIG
 
@@ -1222,7 +1297,17 @@ def agent(obs_dict, configuration=None):
 
     result = _base_lucario_agent(obs_dict)
 
-    # Team Rocket Energy override: re-rank if Enhanced Hammer should be played
+    # Team Rocket Energy override: re-rank ONLY if Enhanced Hammer is an
+    # actual playable option this turn and its score got boosted.
+    #
+    # FIX (was the main bug): the previous version unconditionally
+    # rebuilt `result` from the plain single-ply heuristic scores whenever
+    # the opponent merely had Team Rocket Energy in play — even when
+    # Enhanced Hammer wasn't in hand / wasn't a legal PLAY option and no
+    # score was actually boosted. That silently discarded whatever the
+    # 2-ply search layer (`_base_lucario_agent`) had picked, every single
+    # turn the condition was true, for zero benefit. Now we only touch
+    # `result` when Enhanced Hammer is genuinely available and boosted.
     try:
         if (_op_has_energy_id(obs_dict, _TEAM_ROCKET_ENERGY_ID)
                 and isinstance(obs_dict, dict) and obs_dict.get("select")):
@@ -1231,14 +1316,22 @@ def agent(obs_dict, configuration=None):
                 policy = LucarioPolicy(obs)
                 _, scores = policy.rank_and_scores()
                 my_idx = obs.current.yourIndex
+
+                boosted = False
                 for idx, opt in enumerate(obs.select.option):
                     if opt.type == OptionType.PLAY:
                         card = get_card(obs, AreaType.HAND, opt.index, my_idx)
                         if card is not None and card.id == _ENHANCED_HAMMER_ID:
                             scores[idx] += 20_000
-                n = len(obs.select.option)
-                ranked = sorted(range(n), key=lambda i: scores[i], reverse=True)
-                result = ranked[:obs.select.maxCount]
-    except Exception: pass
+                            boosted = True
+
+                # Only overwrite `result` (and thus discard the search-layer
+                # pick) if we actually found and boosted Enhanced Hammer.
+                if boosted:
+                    n = len(obs.select.option)
+                    ranked = sorted(range(n), key=lambda i: scores[i], reverse=True)
+                    result = ranked[:obs.select.maxCount]
+    except Exception:
+        pass
 
     return result
