@@ -43,6 +43,8 @@ The project began as a reinforcement-learning system and evolved into a broader 
 
 The best RL/PPO submission reached **342.0**, which became the turning point for the project. Instead of forcing a neural policy to learn every tactical interaction from scratch, the project pivoted toward domain-aware planning and replay-driven optimization.
 
+The current candidate is **v22**. It repairs the v21 option-enum regression, includes the later retreat/search safeguards, and prevents Lunar Cycle from discarding the only useful manual Energy attachment. v22 is not considered better than v19 until its real-ladder score proves it.
+
 > **Build the simulator → test an idea → measure it → inspect failures → turn failures into better decisions.**
 
 ---

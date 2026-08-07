@@ -3,7 +3,7 @@
 ## Executive Summary
 
 > **[UPDATE - PHASE 12 PIVOT & REPLAY PATCHING]**
-> *We have completely abandoned the Deep RL approach described below. After extensive testing, the PPO agent hit an Elo ceiling of ~342.0. In contrast, our rule-based `rule_based_lucario.py` agent with Kaggle replay-based misplay fixes reached a **Peak Elo of 936.0** and currently sits at **902.4 Active Elo** on the real Kaggle ladder. We are now exclusively refining the Mega Lucario Rule-Based heuristic. The rest of this document details the legacy RL architecture for historical reference.*
+> *We have completely abandoned the Deep RL approach described below. PPO peaked at 342.0, while Mega Lucario v19 reached the verified rule-based peak of **958.8**. The current v22 candidate fixes v21's option-enum regression and a replay-proven Lunar Cycle ordering mistake, but remains unpromoted until it beats 958.8 on the real ladder. The rest of this document details the legacy RL architecture for historical reference.*
 
 
 Our legacy approach broke away from attempting to solve the entire Pokémon TCG game space. Traditional heuristic bots suffer from combinatorial explosion when playing complex decks, and pure deep-RL bots often timeout under Kaggle’s strict 600s inference limit or crash on illegal actions. We solved this with a hybrid architecture: a highly consistent **Snorlax/Lopunny Control Deck** piloted entirely by a PyTorch-trained **Deep Reinforcement Learning (PPO) Agent**, deployed via a **Pure-NumPy Inference Pipeline**. To guarantee 100% stability, this deep neural network is backed by a **Zero-Crash Heuristic Fallback System** that only triggers if the neural network encounters a critical error.

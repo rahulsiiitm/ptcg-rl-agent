@@ -6,6 +6,7 @@ __pycache__/
 # Kaggle / Submission artifacts (versioned ones committed intentionally)
 submission.tar.gz
 valid_submission.tar.gz
+/v*.tar.gz
 
 # Data and competition files (too large for git)
 data/
@@ -27,3 +28,8 @@ scratch/
 temp_evo/
 temp_sub/
 agent_debug.log*
+/eval/*.json
+/t*.json
+/temp.txt
+/.analysis/
+/.tools/

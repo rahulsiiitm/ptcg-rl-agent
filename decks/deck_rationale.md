@@ -71,3 +71,11 @@ While the rule-based Bellibolt agent was stable, it was fundamentally limited by
 **Why RL Succeeded Here:**
 Instead of brute-forcing the learning from scratch, we used **Behavioral Cloning (BC)** to initialize the PPO agent's weights using our best heuristics, and implemented a **Pure-NumPy Inference Pipeline** to completely bypass the PyTorch `kaggle_environments` inference timeouts and crashes. 
 By training on a diverse **Meta Opponent Curriculum** across 40,000+ episodes (with a critical memory leak fix preventing VRAM exhaustion), the Deep RL agent successfully learned advanced stalling and gusting strategies that the heuristic agent was incapable of executing, achieving a solid 282.3 Elo in Phase 9 and currently training to break the 303.6 peak in Phase 10.
+
+---
+
+## Phase 12: Mega Lucario Rule-Based (CURRENT)
+
+The project ultimately abandoned PPO after its 342.0 peak and moved to the Mega Lucario list in `deck.csv`. Its deterministic, deck-specific heuristic reached **958.8 on the real ladder with v19**, far above every RL build.
+
+The current v22 candidate keeps this deck unchanged. Replay analysis found that the policy—not the list—was wasting turns by activating Lunatone's Lunar Cycle before attaching the Energy it discards as a cost. v22 attaches to an undercharged Lucario/Riolu, Hariyama/Makuhita, or Solrock first. The deck remains fixed while this isolated policy change is tested against the v19 promotion gate.
