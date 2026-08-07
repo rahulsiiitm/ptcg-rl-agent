@@ -113,7 +113,7 @@ def analyze(filepath):
                     if active_id == 675: cap = 0 # Lunatone
                     elif active_id == 676: cap = 1 # Solrock
                     elif active_id == 673: cap = 2 # Makuhita
-                    
+
                     if active_energies < cap:
                         misplays.append({
                             "turn": turn, "type": "ENERGY_NOT_ATTACHED",

@@ -1,6 +1,6 @@
 # v21 Replay Regression Analysis
 
-Date: 2026-08-07  
+Date: 2026-08-07
 Replay set: episodes 90605503–90621445 supplied from the real Kaggle ladder
 
 ## Result
