@@ -108,11 +108,17 @@ def analyze(filepath):
                 # 1. Energy in hand but not attached (turn > 2, active needs energy)
                 energy_count = hand.count(ENERGY)
                 if is_end_of_turn and energy_count > 0 and not energy_attached and turn > 2:
-                    if active_energies < 3:
+                    # Respect agent's intentional energy caps (Lunatone=0, Solrock=1)
+                    cap = 3
+                    if active_id == 675: cap = 0 # Lunatone
+                    elif active_id == 676: cap = 1 # Solrock
+                    elif active_id == 673: cap = 2 # Makuhita
+                    
+                    if active_energies < cap:
                         misplays.append({
                             "turn": turn, "type": "ENERGY_NOT_ATTACHED",
                             "detail": f"Had {energy_count} energy in hand, active {cn(active_id)} "
-                                      f"only has {active_energies} energy. Did not attach!"
+                                      f"only has {active_energies}/{cap} energy. Did not attach!"
                         })
 
                 # 2. Boss's Orders: opponent has low-HP bench Pokémon
@@ -121,7 +127,7 @@ def analyze(filepath):
                         bp_hp  = bp.get("hp", 9999)
                         bp_max = bp.get("maxHp", 9999)
                         bp_id  = bp.get("id")
-                        if bp_max > 0 and bp_hp / bp_max < 0.45:
+                        if bp_max > 0 and bp_hp / bp_max <= 0.40:
                             misplays.append({
                                 "turn": turn, "type": "BOSS_MISSED",
                                 "detail": f"Had Boss Orders, opp bench {cn(bp_id)} at "
@@ -188,8 +194,11 @@ def analyze(filepath):
 
 def run_all():
     import sys
+    import glob
     if len(sys.argv) > 1:
-        replay_files = sys.argv[1:]
+        replay_files = []
+        for arg in sys.argv[1:]:
+            replay_files.extend(glob.glob(arg))
     else:
         replay_files = [
             r"c:\Users\Rahul\Downloads\90325711.json",
