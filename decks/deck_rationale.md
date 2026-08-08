@@ -78,4 +78,27 @@ By training on a diverse **Meta Opponent Curriculum** across 40,000+ episodes (w
 
 The project ultimately abandoned PPO after its 342.0 peak and moved to the Mega Lucario list in `deck.csv`. Its deterministic, deck-specific heuristic reached **958.8 on the real ladder with v19**, far above every RL build.
 
-The current v22 candidate keeps this deck unchanged. Replay analysis found that the policy—not the list—was wasting turns by activating Lunatone's Lunar Cycle before attaching the Energy it discards as a cost. v22 attaches to an undercharged Lucario/Riolu, Hariyama/Makuhita, or Solrock first. The deck remains fixed while this isolated policy change is tested against the v19 promotion gate.
+The current v26 candidate keeps this deck unchanged. v25's 40-game ladder sample averaged roughly 600 and went 19-21, but it was 18-13 outside pure Alakazam. The losses exposed policy defects rather than a clear missing card: Powerful Hand counted the wrong player's hand, terminal attacks tied, safe Mega evolutions were blocked, hand-reset supporters enlarged Alakazam damage, and low-deck games over-searched or opened Boss stalls. v26 fixes those decisions and diversifies Energy only after the first matchup-specific attacker is ready. Keeping the list fixed isolates policy quality against the v19 promotion gate.
+
+The expanded 40-game real-cabt sanity set against the actual v15 Alakazam
+submission went 11-29 with search enabled (16-36 across both searched samples).
+Two expanded-run losses were lone-active openings with no established Bench,
+but the other 27 were ordinary prize losses. This is enough to mark Alakazam as
+a severe matchup weakness, though not enough to change the proven deck without
+testing a concrete replacement list against the rest of the ladder field.
+
+Policy-only experiments with safe extra draw, earlier Mega Energy, and
+Hariyama-specific Hero Cape routing all failed their cabt gates and were
+reverted. The underlying audit then found the decisive rules error: Powerful
+Hand uses the attacking Alakazam player's hand. v27 replaces four Dusk Balls
+with four Hand Trimmers, collapsing that hand to five while preserving eight
+other Basic/non-Rule-Box search cards. The Item is policy-gated to visible
+Alakazam and Mega Froslass axes. This list went 30-30 against the actual v15
+Alakazam agent and 19-21 against the original Lucario list in real cabt.
+
+The next 15 unique v26 ladder games added two deck-independent policy changes
+to v27: stop manually attaching past an attacker's useful Energy goal, and
+permit an attack-enabling attachment in terminal danger when there is no safe
+pivot. This directly addresses the Archaludon games where four to eight Energy
+accumulated on a damaged bench Mega while live attackers stayed empty. It does
+not change the 60-card v27 list.

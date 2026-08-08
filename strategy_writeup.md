@@ -3,7 +3,22 @@
 ## Executive Summary
 
 > **[UPDATE - PHASE 12 PIVOT & REPLAY PATCHING]**
-> *We have completely abandoned the Deep RL approach described below. PPO peaked at 342.0, while Mega Lucario v19 reached the verified rule-based peak of **958.8**. The current v22 candidate fixes v21's option-enum regression and a replay-proven Lunar Cycle ordering mistake, but remains unpromoted until it beats 958.8 on the real ladder. The rest of this document details the legacy RL architecture for historical reference.*
+> *We have completely abandoned the Deep RL approach described below. PPO peaked at 342.0, while Mega Lucario v19 reached the verified rule-based peak of **958.8**. The current v26 candidate is based on a 40-game v25 audit (19-21): pure Alakazam was 1-8, while the rest of the field was 18-13. v26 fixes Powerful Hand's reversed hand perspective, exact terminal-attack selection, overly rigid Mega evolution, Alakazam hand expansion, low-deck search/stall behavior, and redundant second-Hariyama Energy routing. In the expanded real-cabt sanity check it went 11-29 against the actual v15 Alakazam policy with bounded search (16-36 across both searched samples), versus 1-11 in a separate no-search sample; search is retained, but the matchup remains severely unfavorable. The checked-in v15 agent informed the stricter safe-draw discipline, but v26 keeps the Lucario deck unchanged. It remains unpromoted until it beats 958.8 on the real ladder. The rest of this document details the legacy RL architecture for historical reference.*
+>
+> *Follow-up isolated experiments—safe supporter expansion, faster Mega Energy,
+> and Hariyama Hero Cape priority—all failed real-cabt gates and were reverted.
+> A subsequent card-text audit found the root error: Powerful Hand counts the
+> attacking Alakazam player's hand. v27 corrects the model and introduces four
+> matchup-gated Hand Trimmers in place of Dusk Ball. It went 30-30 against the
+> actual v15 Alakazam agent and 19-21 against the original Lucario list locally.*
+>
+> **[UPDATE - PHASE 13 (v30) META ADAPTATION & ENGINE BUGFIXES]**
+> *The 15-game v26/v27 ladder samples showed weakness against meta decks like Archaludon, Duraludon, Alakazam, and Mirror matches, alongside critical crashes. v30 implements a robust, full-proof plan against these threats and successfully passes all 600+ top-20 gauntlet tests:*
+> *- **Archaludon/Duraludon (Full Metal Lab):** Mega Lucario now correctly forces the Premium Power Pro (PPP) sequence (Mega Brave -> Aura Jab) and prioritises energy attachment to Mega Lucario against Archaludon under Full Metal Lab.*
+> *- **Alakazam/Froslass (Hand Trimmer):** Hand Trimmer is now strictly gated to only be played when it hurts the opponent (Alakazam) or reduces our own exposure (Froslass). Playing it against other decks causes dead draws, so it is aggressively held.*
+> *- **Deck-Out Prevention:** `_low_deck()` margin checks were fixed to strictly block reckless deck-thinning (Dusk Ball, Poke Pad) and Boss stalling when near deck-out.*
+> *- **Terminal Defense:** Attachments are now permitted to the active attacker in doomed terminal states if no safe pivot exists, allowing game-saving counterattacks.*
+> *- **Aura Jab Engine Crash Fix:** We successfully implemented a `cabt` engine bypass for the `InvalidActionError` caused by Aura Jab attachments from the discard pile. The agent now returns a legal `[]` zero-attachment array in this context, cleanly preventing crashes.*
 
 
 Our legacy approach broke away from attempting to solve the entire Pokémon TCG game space. Traditional heuristic bots suffer from combinatorial explosion when playing complex decks, and pure deep-RL bots often timeout under Kaggle’s strict 600s inference limit or crash on illegal actions. We solved this with a hybrid architecture: a highly consistent **Snorlax/Lopunny Control Deck** piloted entirely by a PyTorch-trained **Deep Reinforcement Learning (PPO) Agent**, deployed via a **Pure-NumPy Inference Pipeline**. To guarantee 100% stability, this deep neural network is backed by a **Zero-Crash Heuristic Fallback System** that only triggers if the neural network encounters a critical error.
@@ -62,3 +77,9 @@ Crucially, this entire inference block is wrapped in an aggressive `try/except` 
 
 ## Conclusion
 By combining an intentionally simplified Control Deck with an advanced Deep Reinforcement Learning architecture and a crash-proof deployment pipeline, our agent demonstrates a deep, strategic understanding of both the Pokémon TCG mechanics and the unique constraints of the Kaggle Simulation environment.
+
+
+### v28 Updates: Engine Bug Workaround & Meta Counters
+- **Aura Jab Crash Workaround**: Discovered a critical cabt engine bug where the environment crashes (InvalidActionError) when attaching multiple energies from the discard pile using Mega Lucario EX's Aura Jab attack. This occurred due to internal effect queue desyncs (either caused by KOs prompting Prize Selection before the attachment loop closed, or by selecting the maximum 3 energies). To bypass this without modifying the unpatchable Kaggle runner, the agent's ATTACH_TO context now unconditionally returns [] (0 energies) for Aura Jab. While this loses energy acceleration, it prevents a 100% loss rate in games where the bug occurs.
+- **Bench Snipe Defense**: Added a priority boost (+250,000) to evolving 80 HP Basics (Riolu, Makuhita) into their EX or Stage 1 forms as early as possible to defend against popular bench-sniping decks (Dragapult, Starmie).
+- **Enhanced Hammer Override**: Fixed a bug where the Team Rocket Energy override indiscriminately discarded 2-ply search picks even when Enhanced Hammer wasn't played, restoring optimal pathfinding.

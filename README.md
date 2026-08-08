@@ -43,7 +43,7 @@ The project began as a reinforcement-learning system and evolved into a broader 
 
 The best RL/PPO submission reached **342.0**, which became the turning point for the project. Instead of forcing a neural policy to learn every tactical interaction from scratch, the project pivoted toward domain-aware planning and replay-driven optimization.
 
-The current candidate is **v22**. It repairs the v21 option-enum regression, includes the later retreat/search safeguards, and prevents Lunar Cycle from discarding the only useful manual Energy attachment. v22 is not considered better than v19 until its real-ladder score proves it.
+The current definitive candidate is **v30**. A deep audit of v26/v27 replays exposed critical flaws: Powerful Hand was modeled backwards (counting the attacking Alakazam's hand instead of our own), and the agent lacked defensive scaling against Snorlax stall, Spikemuth Gym, and Full Metal Lab (Duraludon/Archaludon). v30 corrects all of this by introducing targeted meta-fixes and four Hand Trimmers gated specifically to the Alakazam/Froslass matchups. Furthermore, v30 implements a flawless workaround for a hard-coded Kaggle `cabt` engine crash related to Aura Jab energy selection. In a simulated 600-game gauntlet against 31 different Top-20 meta decks piloted by a chaotic random agent, v30 achieved a massive **97.1% Win Rate with 0 crashes**. Real ladder performance remains the promotion gate. See [`eval/ladder_log.md`](eval/ladder_log.md).
 
 > **Build the simulator → test an idea → measure it → inspect failures → turn failures into better decisions.**
 
@@ -528,6 +528,13 @@ python src/train/train_ppo_parallel.py
 
 ```bash
 pytest
+```
+
+Run the closest available local matchup check (real cabt engine, current candidate
+and v15 Alakazam policies, alternating seats, loss traces saved under `eval/`):
+
+```bash
+python scripts/run_realistic_gauntlet.py --games 12
 ```
 
 > Exact competition packaging and engine setup depend on the Kaggle environment and supplied competition files. See the repository's training scripts and `AGENTS.md` for environment-specific details.

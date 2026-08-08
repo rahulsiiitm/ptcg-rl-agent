@@ -79,12 +79,12 @@ runtime. Crashes observed in Phase 2 were **Turn 0 deck-submission bugs**, not m
 
 ## Current status
 
-Phase 12: Pivot to Rule-Based. The Phase 11 PPO approach maxed out around 342.0 Elo, but the hardcoded `rule_based_lucario.py` agent consistently hits 600+ Elo on the real Kaggle ladder. We have abandoned the RL approach.
+Phase 13: Rule-Based Polish. The Phase 11 PPO approach maxed out around 342.0 Elo, but the hardcoded `rule_based_lucario.py` agent consistently hits 600+ Elo on the real Kaggle ladder. We have abandoned the RL approach.
 
-- **Current Candidate Build:** **v22** (`v22.tar.gz` / `submissions/v22.tar.gz`) — Post-v21 enum/search safety fixes plus a replay-proven attachment-before-Lunar-Cycle invariant. Awaiting real-ladder validation.
+- **Current Candidate Build:** **v29** (`v29.tar.gz` / `submissions/v29.tar.gz`) — Adds critical opponent stadium detection (Spikemuth Gym/Lumiose City) to prevent passing turns on useless abilities, and adds Hop's Snorlax axis detection to correctly prioritize Hop KOs.
 - **Current Peak (Rule-Based Lucario): 958.8** (Achieved with v19; still the promotion gate.)
 - **Abandoned RL Peak: 342.0**
-- **Next Target:** Validate v22 against the real ladder; target 1000+ Elo without promoting it unless it beats v19's 958.8.
+- **Next Target:** Validate v29 against the real ladder. The past several submissions were plagued by old agent bugs (skipping attacks, ignoring energy attachments). v29 should stop the bleeding.
 
 
 
