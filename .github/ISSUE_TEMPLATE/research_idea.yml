@@ -1,0 +1,51 @@
+name: Research idea
+description: Propose an experiment, model, search strategy, or evaluation direction
+title: "[Research] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Research ideas do not need to be finished solutions. A clear hypothesis and a measurable experiment are enough.
+  - type: textarea
+    id: question
+    attributes:
+      label: Research question
+      description: What are you trying to learn or improve?
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Which limitation, replay failure, benchmark result, or opportunity motivates this idea?
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed approach
+      description: Describe the smallest useful experiment first.
+    validations:
+      required: true
+  - type: textarea
+    id: evaluation
+    attributes:
+      label: How should we evaluate it?
+      description: Include baselines, tactical scenarios, simulations, ladder evidence, latency, or other useful metrics.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks / trade-offs
+      description: What could make the result misleading, slow, brittle, or hard to deploy?
+  - type: checkboxes
+    id: evidence
+    attributes:
+      label: Evidence discipline
+      options:
+        - label: I will distinguish hypotheses from confirmed results.
+          required: true
+        - label: I will distinguish simulation results from real Kaggle ladder results.
+          required: true
